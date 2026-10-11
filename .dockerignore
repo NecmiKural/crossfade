@@ -8,7 +8,10 @@ coverage
 graphify-out
 docs
 .env*
+**/.env*
 !.env.example
+*.pem
+**/*.pem
 Dockerfile
 .dockerignore
 compose*.yaml
