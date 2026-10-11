@@ -1,9 +1,10 @@
-import { asc, desc, sql } from "drizzle-orm";
+import { asc, desc, gt, inArray, or, sql } from "drizzle-orm";
 import { sha256Hex } from "@/lib/core/hash";
 import type { ActorRef } from "@/lib/core/policy";
 import type { Tx } from "@/lib/db/client";
-import { apps, snapshots, versions } from "@/lib/db/schema";
+import { apps, type ReleaseStatus, releases, snapshots, versions } from "@/lib/db/schema";
 import { renderClusters, renderRoutes } from "@/lib/xds/render";
+import { CLUSTER_GRACE_MS, renderedVersionIds } from "@/lib/xds/render-context";
 import type { RenderApp, RenderContext } from "@/lib/xds/types";
 import { validateSnapshot } from "@/lib/xds/validate";
 
@@ -20,17 +21,31 @@ export class SnapshotValidationError extends Error {
   }
 }
 
+const ACTIVE: readonly ReleaseStatus[] = ["pending_approval", "warming", "rolling", "paused"];
+
 async function loadRenderContext(tx: Tx): Promise<RenderContext> {
+  const now = new Date();
   const appRows = await tx.select().from(apps).orderBy(asc(apps.slug));
   const versionRows = await tx.select().from(versions).orderBy(asc(versions.name));
+  const releaseRows = await tx
+    .select()
+    .from(releases)
+    .where(or(inArray(releases.status, [...ACTIVE]), gt(releases.finishedAt, new Date(now.getTime() - CLUSTER_GRACE_MS))));
   const renderApps: RenderApp[] = appRows.map((app) => {
     const own = versionRows.filter((v) => v.appId === app.id);
+    const ownReleases = releaseRows.filter((r) => r.appId === app.id);
+    const keep = renderedVersionIds({ stableVersionId: app.stableVersionId, releases: ownReleases, now });
+    const active = ownReleases.find((r) => ACTIVE.includes(r.status));
+    const nameOf = (id: string) => own.find((v) => v.id === id)?.name;
     return {
       slug: app.slug,
       domain: app.domain,
       pathPrefix: app.pathPrefix,
-      stableVersion: own.find((v) => v.id === app.stableVersionId)?.name ?? null,
-      versions: own.map(({ name, host, port, healthPath }) => ({ name, host, port, healthPath })),
+      stableVersion: app.stableVersionId ? (nameOf(app.stableVersionId) ?? null) : null,
+      sticky: app.sticky,
+      testerToken: app.testerToken,
+      release: active ? { status: active.status, candidate: nameOf(active.candidateVersionId) ?? "", weight: active.weight } : null,
+      versions: own.filter((v) => keep.has(v.id)).map(({ name, host, port, healthPath }) => ({ name, host, port, healthPath })),
     };
   });
   return { apps: renderApps };

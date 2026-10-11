@@ -25,7 +25,9 @@ describe("catalog service", () => {
     const rows = await getDb().select().from(snapshots).orderBy(snapshots.id);
     const latestRoutes = JSON.parse(rows[rows.length - 1].routes);
     expect(shop.stableVersionId).not.toBeNull();
-    expect(rows.length).toBe(3);
+    // v2 is registered but not released, so it is not rendered and the snapshot does not change.
+    expect(rows.length).toBe(2);
+    expect(JSON.parse(rows[rows.length - 1].clusters).map((c: { name: string }) => c.name)).toEqual(["shop--v1"]);
     expect(latestRoutes[0].virtual_hosts[0].routes[0].route.cluster).toBe("shop--v1");
     const trail = await getDb().select().from(events).orderBy(events.id);
     expect(trail.map((e) => [e.type, e.actorKind, e.actorId])).toEqual([

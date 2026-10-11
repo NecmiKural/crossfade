@@ -8,6 +8,9 @@ const shop: RenderApp = {
   domain: "localhost",
   pathPrefix: "/",
   stableVersion: "v1",
+  sticky: true,
+  testerToken: "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+  release: null,
   versions: [
     { name: "v2", host: "shop-v2", port: 3000, healthPath: "/healthz" },
     { name: "v1", host: "shop-v1", port: 3000, healthPath: "/healthz" },
@@ -18,6 +21,9 @@ const api: RenderApp = {
   domain: "localhost",
   pathPrefix: "/api",
   stableVersion: "blue",
+  sticky: true,
+  testerToken: "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+  release: null,
   versions: [{ name: "blue", host: "api-blue", port: 8080, healthPath: "/status" }],
 };
 const blog: RenderApp = {
@@ -25,6 +31,9 @@ const blog: RenderApp = {
   domain: "blog.example.com",
   pathPrefix: "/",
   stableVersion: null,
+  sticky: true,
+  testerToken: "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+  release: null,
   versions: [],
 };
 
@@ -91,10 +100,80 @@ describe("renderRoutes", () => {
   });
 });
 
+describe("releases", () => {
+  const v2Rolling = (weight: number, sticky = true): RenderContext => ({
+    apps: [{ ...shop, sticky, release: { status: "rolling", candidate: "v2", weight } }],
+  });
+  const mainRoute = (c: RenderContext) =>
+    (renderRoutes(c).virtual_hosts as Array<{ routes: Array<Record<string, unknown>> }>)[0].routes.find((r) => r.name === "shop");
+
+  it("splits traffic [100-w, w] and hashes the leftmost X-Forwarded-For when sticky", () => {
+    expect(mainRoute(v2Rolling(10))?.route).toEqual({
+      weighted_clusters: {
+        clusters: [
+          { name: "shop--v1", weight: 90 },
+          { name: "shop--v2", weight: 10 },
+        ],
+        use_hash_policy: true,
+      },
+      timeout: "60s",
+      hash_policy: [
+        { header: { header_name: "x-forwarded-for", regex_rewrite: { pattern: { regex: "^\\s*([^,\\s]+).*$" }, substitution: "\\1" } } },
+      ],
+    });
+  });
+
+  it("splits per request when the app is not sticky", () => {
+    const route = mainRoute(v2Rolling(50, false))?.route as Record<string, unknown>;
+    expect(route.hash_policy).toBeUndefined();
+    expect(route.weighted_clusters).toEqual({
+      clusters: [
+        { name: "shop--v1", weight: 50 },
+        { name: "shop--v2", weight: 50 },
+      ],
+    });
+  });
+
+  it("keeps the plain stable route at weight 0 and while paused at 0", () => {
+    expect(mainRoute(v2Rolling(0))?.route).toEqual({ cluster: "shop--v1", timeout: "60s" });
+    const paused: RenderContext = { apps: [{ ...shop, release: { status: "paused", candidate: "v2", weight: 50 } }] };
+    expect((mainRoute(paused)?.route as Record<string, unknown>).weighted_clusters).toBeDefined();
+  });
+
+  it.each(["pending_approval", "warming"] as const)("adds the tester route ahead of the main route while %s", (status) => {
+    const c: RenderContext = { apps: [{ ...shop, release: { status, candidate: "v2", weight: 0 } }] };
+    const routes = (renderRoutes(c).virtual_hosts as Array<{ routes: Array<Record<string, unknown>> }>)[0].routes;
+    expect(routes.map((r) => r.name)).toEqual(["shop.tester", "shop"]);
+    expect(routes[0]).toEqual({
+      name: "shop.tester",
+      match: { prefix: "/", headers: [{ name: "x-crossfade-tester", string_match: { exact: "t".repeat(64) } }] },
+      route: { cluster: "shop--v2", timeout: "60s" },
+      request_headers_to_remove: ["x-crossfade-tester"],
+    });
+  });
+
+  it.each(["rolling", "paused", "promoted", "rolled_back", "cancelled"] as const)("has no tester route while %s", (status) => {
+    const c: RenderContext = { apps: [{ ...shop, release: { status, candidate: "v2", weight: 10 } }] };
+    const routes = (renderRoutes(c).virtual_hosts as Array<{ routes: Array<Record<string, unknown>> }>)[0].routes;
+    expect(routes.map((r) => r.name)).toEqual(["shop"]);
+  });
+});
+
 describe("Envoy fixtures", () => {
   it("stable-only bootstrap", async () => {
     await expect(fixtureJson(staticBootstrap(renderClusters(ctx), renderRoutes(ctx)))).toMatchFileSnapshot(
       "../../envoy/fixtures/stable.json",
+    );
+  });
+
+  it.each([
+    ["warming", { status: "warming", candidate: "v2", weight: 0 }, true],
+    ["rolling-sticky", { status: "rolling", candidate: "v2", weight: 10 }, true],
+    ["rolling-random", { status: "rolling", candidate: "v2", weight: 50 }, false],
+  ] as const)("%s bootstrap", async (name, release, sticky) => {
+    const c: RenderContext = { apps: [{ ...shop, sticky, release }, api] };
+    await expect(fixtureJson(staticBootstrap(renderClusters(c), renderRoutes(c)))).toMatchFileSnapshot(
+      `../../envoy/fixtures/${name}.json`,
     );
   });
 

@@ -39,9 +39,8 @@ describe("publishSnapshot", () => {
 
   it("keeps the CDS version when only routes change", async () => {
     const { shop } = await shopWithStable();
-    const v2 = await insertVersion(shop.id, "v2");
     const first = await publish();
-    await getDb().update(apps).set({ stableVersionId: v2.id }).where(eq(apps.id, shop.id));
+    await getDb().update(apps).set({ pathPrefix: "/shop" }).where(eq(apps.id, shop.id));
     const second = await publish();
     expect(second.cdsVersion).toBe(first.cdsVersion);
     expect(second.rdsVersion).toBeGreaterThan(first.rdsVersion);

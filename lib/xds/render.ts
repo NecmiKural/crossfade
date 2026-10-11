@@ -6,6 +6,7 @@ import {
   type RenderContext,
   type RenderVersion,
   ROUTE_CONFIGURATION_TYPE,
+  TESTER_HEADER,
 } from "@/lib/xds/types";
 
 const HTTP_PROTOCOL_OPTIONS = "envoy.extensions.upstreams.http.v3.HttpProtocolOptions";
@@ -59,16 +60,56 @@ function matchFor(app: RenderApp): Record<string, string> {
   return app.pathPrefix === "/" ? { prefix: "/" } : { path_separated_prefix: app.pathPrefix };
 }
 
-function renderRoute(app: RenderApp): Record<string, unknown> {
-  if (!app.stableVersion) {
-    return {
-      name: app.slug,
-      match: matchFor(app),
-      direct_response: { status: 503, body: { inline_string: `crossfade: ${app.slug} has no stable version\n` } },
-    };
-  }
+/** Hash only the leftmost X-Forwarded-For entry, so changing proxy hops do not reshuffle users (ADR-0005). */
+const STICKY_HASH_POLICY = [
+  { header: { header_name: "x-forwarded-for", regex_rewrite: { pattern: { regex: "^\\s*([^,\\s]+).*$" }, substitution: "\\1" } } },
+];
+
+function splitWeight(app: RenderApp): number | null {
+  const release = app.release;
+  if (!release || (release.status !== "rolling" && release.status !== "paused")) return null;
+  return release.weight >= 1 && release.weight <= 99 ? release.weight : null;
+}
+
+function mainAction(app: RenderApp, stable: string): Record<string, unknown> {
+  const weight = splitWeight(app);
   // No retry_policy: retries would hide the 5xx responses the canary gate measures.
-  return { name: app.slug, match: matchFor(app), route: { cluster: clusterName(app.slug, app.stableVersion), timeout: ROUTE_TIMEOUT } };
+  if (weight === null || !app.release) return { cluster: clusterName(app.slug, stable), timeout: ROUTE_TIMEOUT };
+  const weighted = {
+    clusters: [
+      { name: clusterName(app.slug, stable), weight: 100 - weight },
+      { name: clusterName(app.slug, app.release.candidate), weight },
+    ],
+    ...(app.sticky ? { use_hash_policy: true } : {}),
+  };
+  return { weighted_clusters: weighted, timeout: ROUTE_TIMEOUT, ...(app.sticky ? { hash_policy: STICKY_HASH_POLICY } : {}) };
+}
+
+/** Before any user traffic, a secret header lets testers reach the candidate. Never during the canary itself. */
+function testerRoute(app: RenderApp): Record<string, unknown> | null {
+  const release = app.release;
+  if (!release || (release.status !== "pending_approval" && release.status !== "warming")) return null;
+  return {
+    name: `${app.slug}.tester`,
+    match: { ...matchFor(app), headers: [{ name: TESTER_HEADER, string_match: { exact: app.testerToken } }] },
+    route: { cluster: clusterName(app.slug, release.candidate), timeout: ROUTE_TIMEOUT },
+    request_headers_to_remove: [TESTER_HEADER],
+  };
+}
+
+function renderAppRoutes(app: RenderApp): Record<string, unknown>[] {
+  if (!app.stableVersion) {
+    return [
+      {
+        name: app.slug,
+        match: matchFor(app),
+        direct_response: { status: 503, body: { inline_string: `crossfade: ${app.slug} has no stable version\n` } },
+      },
+    ];
+  }
+  const tester = testerRoute(app);
+  const main = { name: app.slug, match: matchFor(app), route: mainAction(app, app.stableVersion) };
+  return tester ? [tester, main] : [main];
 }
 
 function byPrefixLengthThenSlug(a: RenderApp, b: RenderApp): number {
@@ -83,7 +124,7 @@ export function renderRoutes(ctx: RenderContext): EnvoyResource {
     routes: ctx.apps
       .filter((app) => app.domain === domain)
       .sort(byPrefixLengthThenSlug)
-      .map(renderRoute),
+      .flatMap(renderAppRoutes),
   }));
   const fallback = {
     name: "fallback",
