@@ -14,8 +14,10 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { user } from "@/lib/db/auth-schema";
 
 const SLUG_SQL = "^[a-z0-9]+(-[a-z0-9]+)*$";
 // Mirrors lib/core/schemas.ts, so rows written outside the app still render to valid Envoy config.
@@ -134,11 +136,94 @@ export const events = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    foreignKey({ name: "events_release_fk", columns: [t.releaseId], foreignColumns: [releases.id] }).onDelete("cascade"),
     index("events_release_idx").on(t.releaseId, t.id),
     index("events_app_idx").on(t.appId, t.id),
     check("events_actor_kind", sql`${t.actorKind} IN ('user', 'apikey', 'engine', 'system')`),
   ],
 );
+
+export const RELEASE_STATUSES = ["pending_approval", "warming", "rolling", "paused", "promoted", "rolled_back", "cancelled"] as const;
+export type ReleaseStatus = (typeof RELEASE_STATUSES)[number];
+const ACTIVE_STATUSES_SQL = "'pending_approval', 'warming', 'rolling', 'paused'";
+
+/** One attempt to move an app from one version to another. Shown as SHOP-R7 (number per app). */
+export const releases = pgTable(
+  "releases",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    appId: uuid("app_id")
+      .notNull()
+      .references((): AnyPgColumn => apps.id, { onDelete: "cascade" }),
+    number: integer("number").notNull(),
+    fromVersionId: uuid("from_version_id").notNull(),
+    candidateVersionId: uuid("candidate_version_id").notNull(),
+    /** A frozen copy of the plan, so later catalog changes never alter a running release. */
+    plan: jsonb("plan").notNull(),
+    status: text("status").$type<ReleaseStatus>().notNull(),
+    statusChangedAt: timestamp("status_changed_at", { withTimezone: true }).notNull().defaultNow(),
+    stepIndex: integer("step_index").notNull().default(0),
+    weight: integer("weight").notNull().default(0),
+    snapshotId: bigint("snapshot_id", { mode: "number" }).references((): AnyPgColumn => snapshots.id),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    stepLiveAt: timestamp("step_live_at", { withTimezone: true }),
+    baseline: jsonb("baseline"),
+    holdReason: text("hold_reason"),
+    holdDetail: jsonb("hold_detail"),
+    nextCheckAt: timestamp("next_check_at", { withTimezone: true }).notNull().defaultNow(),
+    notes: text("notes"),
+    requestHash: text("request_hash"),
+    createdByKind: text("created_by_kind").notNull(),
+    /** The person behind the release: the signed-in user, or the owner of the API key. */
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references((): AnyPgColumn => user.id),
+    createdViaKeyId: text("created_via_key_id"),
+    approvedBy: text("approved_by").references((): AnyPgColumn => user.id),
+    outcome: jsonb("outcome"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [
+    unique("releases_app_number_unique").on(t.appId, t.number),
+    // Both versions must belong to the release's app (tenant isolation in the schema).
+    foreignKey({ name: "releases_from_version_fk", columns: [t.appId, t.fromVersionId], foreignColumns: [versions.appId, versions.id] }),
+    foreignKey({ name: "releases_candidate_version_fk", columns: [t.appId, t.candidateVersionId], foreignColumns: [versions.appId, versions.id] }),
+    check("releases_distinct_versions", sql`${t.fromVersionId} <> ${t.candidateVersionId}`),
+    check("releases_status", sql.raw(`status IN (${RELEASE_STATUSES.map((s) => `'${s}'`).join(", ")})`)),
+    check("releases_weight_range", sql`${t.weight} BETWEEN 0 AND 100`),
+    check("releases_notes_length", sql`${t.notes} IS NULL OR length(${t.notes}) <= 2000`),
+    check("releases_created_by_kind", sql`${t.createdByKind} IN ('user', 'apikey')`),
+    uniqueIndex("one_active_release_per_app").on(t.appId).where(sql.raw(`status IN (${ACTIVE_STATUSES_SQL})`)),
+    index("releases_due_idx").on(t.status, t.nextCheckAt),
+    index("releases_finished_idx").on(t.appId, t.finishedAt),
+  ],
+);
+
+/** Per-tick counters the engine saw for a release (sparklines, evidence). */
+export const releaseSamples = pgTable(
+  "release_samples",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    releaseId: uuid("release_id")
+      .notNull()
+      .references((): AnyPgColumn => releases.id, { onDelete: "cascade" }),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    stableCompleted: bigint("stable_completed", { mode: "number" }).notNull(),
+    stableErrors: bigint("stable_errors", { mode: "number" }).notNull(),
+    candidateCompleted: bigint("candidate_completed", { mode: "number" }).notNull(),
+    candidateErrors: bigint("candidate_errors", { mode: "number" }).notNull(),
+    candidateHealthy: integer("candidate_healthy").notNull(),
+  },
+  (t) => [index("release_samples_release_idx").on(t.releaseId, t.at)],
+);
+
+/** Liveness of background workers (the engine), shown on the console and /api/health. */
+export const heartbeats = pgTable("heartbeats", {
+  name: text("name").primaryKey(),
+  at: timestamp("at", { withTimezone: true }).notNull(),
+});
 
 // Better Auth tables (generated by `npx auth generate`, see auth.cli.ts).
 export * from "@/lib/db/auth-schema";

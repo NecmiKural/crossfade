@@ -43,6 +43,13 @@
       "when": 1791690289036,
       "tag": "0005_events",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791690443798,
+      "tag": "0006_releases",
+      "breakpoints": true
     }
   ]
 }
