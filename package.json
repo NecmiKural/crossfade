@@ -11,7 +11,8 @@
     "test": "vitest run --project unit",
     "test:db": "vitest run --project db",
     "coverage": "vitest run --project unit --coverage",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "build:workers": "node scripts/build-workers.mjs"
   },
   "dependencies": {
     "drizzle-orm": "0.45.4",
@@ -29,11 +30,17 @@
     "@types/react-dom": "19.3.0",
     "@vitest/coverage-v8": "5.0.3",
     "drizzle-kit": "0.31.11",
+    "esbuild": "0.28.2",
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.0",
     "tailwindcss": "4.3.3",
     "typescript": "5.9.3",
     "vite": "8.3.4",
     "vitest": "5.0.3"
+  },
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "$esbuild"
+    }
   }
 }
