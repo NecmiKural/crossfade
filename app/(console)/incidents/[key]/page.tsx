@@ -8,7 +8,7 @@ import { getDb } from "@/lib/db/client";
 export default async function IncidentPage({ params }: PageProps<"/incidents/[key]">) {
   await requireUser();
   const { key } = await params;
-  const detail = await incidentDetail(getDb(), decodeURIComponent(key));
+  const detail = await incidentDetail(getDb(), key);
   if (!detail) notFound();
   const { summary } = detail;
   const open = summary.status === "open";

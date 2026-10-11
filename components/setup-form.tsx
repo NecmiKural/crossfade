@@ -35,8 +35,9 @@ export function SetupForm({ token }: { token: string }) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       return setError(MESSAGES[body.error ?? ""] ?? "Setup failed. Check the server logs.");
     }
-    await authClient.signIn.email({ email, password });
-    router.push("/board");
+    // The owner exists now; if the automatic sign-in fails (say, rate limited), signing in by hand works.
+    const { error: signInError } = await authClient.signIn.email({ email, password });
+    router.push(signInError ? "/login" : "/board");
     router.refresh();
   }
 

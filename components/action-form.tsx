@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { startTransition, useActionState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { type FormState, initialFormState } from "@/lib/form-state";
 
@@ -18,9 +18,20 @@ type Props = {
 /** A form bound to a server action, with inline success, error and per-field messages. */
 export function ActionForm({ action, submitLabel, pendingLabel, variant = "default", className, children, renderValue }: Props) {
   const [state, formAction, pending] = useActionState(action, initialFormState);
+  const formRef = useRef<HTMLFormElement>(null);
+  // React resets a form after every action, which would wipe what the person typed when the server
+  // rejects it. Submitting by hand skips that reset, so the form is cleared only on success.
+  useEffect(() => {
+    if (state.ok) formRef.current?.reset();
+  }, [state]);
+  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    startTransition(() => formAction(form));
+  }
   const fieldErrors = Object.entries(state.fieldErrors ?? {}).filter(([, v]) => v?.length);
   return (
-    <form action={formAction} className={className ?? "space-y-3"}>
+    <form ref={formRef} action={formAction} onSubmit={onSubmit} className={className ?? "space-y-3"}>
       {children}
       {fieldErrors.length > 0 ? (
         <ul role="alert" className="space-y-0.5 text-sm text-destructive">

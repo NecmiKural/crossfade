@@ -23,7 +23,8 @@ export default async function EdgePage() {
   const [nodes, snapshot] = await Promise.all([edgeNodesOverview(getDb()), latestSnapshotDetail(getDb())]);
   return (
     <div className="space-y-6">
-      <AutoRefresh />
+      {/* Every refresh re-sends the whole served config; node states change on a 15 s scale anyway. */}
+      <AutoRefresh intervalMs={5000} />
       <h1 className="text-xl font-semibold tracking-tight">Edge</h1>
       <Panel legend="Envoy nodes">
         <Table>
