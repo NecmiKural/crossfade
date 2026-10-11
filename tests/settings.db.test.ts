@@ -4,7 +4,8 @@ import { closeDb, getDb } from "@/lib/db/client";
 import { addUser, createScopedKey, listKeys, listUsers, revokeKey } from "@/lib/settings";
 import { stubAuthEnv } from "./helpers/auth";
 import { insertApp, resetDb } from "./helpers/db";
-import { user } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { apikey, user } from "@/lib/db/schema";
 
 const admin: Actor = { kind: "user", id: "u-admin", role: "admin", readOnly: false };
 const alice: Actor = { kind: "user", id: "u-alice", role: "user", readOnly: false };
@@ -38,6 +39,12 @@ describe("settings", () => {
     expect(listed).toMatchObject({ name: "ci", apps: ["shop"], enabled: true, owner: "admin@example.test" });
     await revokeKey(getDb(), admin, created.id);
     expect((await listKeys(getDb()))[0].enabled).toBe(false);
+  });
+
+  it("lists a key whose permissions are not valid JSON as scoped to no apps", async () => {
+    const created = await createScopedKey(getDb(), admin, { name: "ci", apps: ["shop"] });
+    await getDb().update(apikey).set({ permissions: "{not json" }).where(eq(apikey.id, created.id));
+    expect((await listKeys(getDb()))[0]).toMatchObject({ name: "ci", apps: [] });
   });
 
   it("denies non-admins", async () => {

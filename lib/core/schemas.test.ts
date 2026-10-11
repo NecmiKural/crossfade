@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AppKey,
+  parseInput,
   Domain,
   HealthPath,
   Hostname,
@@ -77,5 +78,12 @@ describe("Password", () => {
   it("rejects shorter or longer", () => {
     expect(ok(Password, "a".repeat(11))).toBe(false);
     expect(ok(Password, "a".repeat(129))).toBe(false);
+  });
+});
+
+describe("parseInput", () => {
+  it("returns the parsed value or throws invalid_request with field errors", () => {
+    expect(parseInput(Port, 8080)).toBe(8080);
+    expect(() => parseInput(Port, 0)).toThrow(expect.objectContaining({ code: "invalid_request" }));
   });
 });

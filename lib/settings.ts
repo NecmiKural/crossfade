@@ -3,19 +3,13 @@ import { z } from "zod";
 import { getAuth } from "@/lib/auth";
 import { AppError } from "@/lib/core/errors";
 import { type Actor, actorRef, can } from "@/lib/core/policy";
-import { Password, Slug } from "@/lib/core/schemas";
+import { Password, parseInput, Slug } from "@/lib/core/schemas";
 import type { Db } from "@/lib/db/client";
 import { apikey, apps, user } from "@/lib/db/schema";
 import { appendEvent } from "@/lib/events";
 
 function assertAdmin(actor: Actor): void {
   if (!can(actor, { type: "settings.manage" })) throw new AppError("forbidden", "only admins can manage users and keys");
-}
-
-function parse<T extends z.ZodType>(schema: T, input: unknown): z.infer<T> {
-  const result = schema.safeParse(input);
-  if (!result.success) throw new AppError("invalid_request", "invalid input", z.flattenError(result.error).fieldErrors);
-  return result.data;
 }
 
 export const NewUser = z.object({
@@ -33,7 +27,7 @@ export async function listUsers(db: Db) {
 /** Admin-only. With the admin's request headers, Better Auth checks the role a second time. */
 export async function addUser(db: Db, actor: Actor, input: z.input<typeof NewUser>, headers?: Headers): Promise<{ id: string }> {
   assertAdmin(actor);
-  const data = parse(NewUser, input);
+  const data = parseInput(NewUser, input);
   const exists = await db.select({ id: user.id }).from(user).where(eq(user.email, data.email.toLowerCase()));
   if (exists.length > 0) throw new AppError("email_taken", "a user with this email already exists");
   const created = await getAuth().api.createUser({ body: data, ...(headers ? { headers } : {}) });
@@ -47,7 +41,7 @@ export const NewKey = z.object({ name: z.string().trim().min(1).max(100), apps: 
 export async function createScopedKey(db: Db, actor: Actor, input: z.input<typeof NewKey>): Promise<{ id: string; key: string; apps: string[] }> {
   assertAdmin(actor);
   if (actor.kind !== "user") throw new AppError("forbidden", "keys are owned by people");
-  const data = parse(NewKey, input);
+  const data = parseInput(NewKey, input);
   const scope = [...new Set(data.apps)].sort();
   const known = await db.select({ slug: apps.slug }).from(apps).where(inArray(apps.slug, scope));
   if (known.length !== scope.length) throw new AppError("unknown_app", "every app in the scope must exist");
@@ -57,13 +51,23 @@ export async function createScopedKey(db: Db, actor: Actor, input: z.input<typeo
   return { id: created.id, key: created.key, apps: scope };
 }
 
+/** The apps a key may release, as stored by the plugin; anything unreadable lists as no apps. */
+function scopeOf(permissions: string | null): string[] {
+  try {
+    const apps: unknown = JSON.parse(permissions ?? "{}")?.apps;
+    return Array.isArray(apps) ? apps.filter((a) => typeof a === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function listKeys(db: Db) {
   const rows = await db
     .select({ id: apikey.id, name: apikey.name, start: apikey.start, enabled: apikey.enabled, permissions: apikey.permissions, owner: user.email, createdAt: apikey.createdAt, lastRequest: apikey.lastRequest })
     .from(apikey)
     .leftJoin(user, eq(user.id, apikey.referenceId))
     .orderBy(desc(apikey.createdAt));
-  return rows.map((r) => ({ ...r, apps: (JSON.parse(r.permissions ?? "{}") as { apps?: string[] }).apps ?? [] }));
+  return rows.map((r) => ({ ...r, apps: scopeOf(r.permissions) }));
 }
 
 /** Disables a key (kept for the audit trail); it stops working on the next request. */

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AppError } from "@/lib/core/errors";
 import { PLAN_IDS } from "@/lib/core/plans";
 
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -46,4 +47,11 @@ export type ReleaseRequestInput = z.infer<typeof ReleaseRequest>;
 
 export function releaseRequestJsonSchema(): unknown {
   return z.toJSONSchema(ReleaseRequest, { io: "input" });
+}
+
+/** Parses untrusted input or throws `invalid_request` with per-field messages (forms and the API show them). */
+export function parseInput<T extends z.ZodType>(schema: T, input: unknown): z.infer<T> {
+  const result = schema.safeParse(input);
+  if (!result.success) throw new AppError("invalid_request", "invalid input", z.flattenError(result.error).fieldErrors);
+  return result.data;
 }

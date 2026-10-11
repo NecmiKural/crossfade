@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { type Allowlist, isAllowed } from "@/lib/core/allowlist";
 import { AppError } from "@/lib/core/errors";
-import { AppKey, Domain, HealthPath, Hostname, PathPrefix, PlanId, Port, Slug, VersionName } from "@/lib/core/schemas";
+import { AppKey, Domain, HealthPath, Hostname, PathPrefix, PlanId, Port, parseInput, Slug, VersionName } from "@/lib/core/schemas";
 import type { Tx } from "@/lib/db/client";
 import { apps, versions } from "@/lib/db/schema";
 import { upstreamAllowlist } from "@/lib/env";
@@ -30,19 +30,13 @@ export const NewVersion = z.object({
 export type AppRow = typeof apps.$inferSelect;
 export type VersionRow = typeof versions.$inferSelect;
 
-function parse<T extends z.ZodType>(schema: T, input: unknown): z.infer<T> {
-  const result = schema.safeParse(input);
-  if (!result.success) throw new AppError("invalid_request", "invalid input", z.flattenError(result.error).fieldErrors);
-  return result.data;
-}
-
 export async function findApp(tx: Tx, slug: string): Promise<AppRow | undefined> {
   const [row] = await tx.select().from(apps).where(eq(apps.slug, slug));
   return row;
 }
 
 export async function createApp(tx: Tx, input: z.input<typeof NewApp>, actor: ActorRef): Promise<AppRow> {
-  const data = parse(NewApp, input);
+  const data = parseInput(NewApp, input);
   const [row] = await tx
     .insert(apps)
     .values({ ...data, testerToken: randomBytes(32).toString("hex") })
@@ -62,7 +56,7 @@ export async function registerVersion(
   actor: ActorRef,
   allowlist: Allowlist = upstreamAllowlist(),
 ): Promise<VersionRow> {
-  const data = parse(NewVersion, input);
+  const data = parseInput(NewVersion, input);
   const app = await findApp(tx, data.app);
   if (!app) throw new AppError("unknown_app", `unknown app "${data.app}"`);
   if (!isAllowed(allowlist, app.slug, data.host, data.port)) {

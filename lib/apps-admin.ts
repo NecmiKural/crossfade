@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createApp, findApp, type AppRow, NewApp, NewVersion, registerVersion, type VersionRow } from "@/lib/apps";
 import { AppError } from "@/lib/core/errors";
 import { type Action, type Actor, actorRef, can } from "@/lib/core/policy";
-import { PlanId } from "@/lib/core/schemas";
+import { PlanId, parseInput } from "@/lib/core/schemas";
 import type { Db, Tx } from "@/lib/db/client";
 import { apps, versions } from "@/lib/db/schema";
 import { appendEvent } from "@/lib/events";
@@ -54,7 +54,7 @@ export const AppSettings = z.object({ defaultPlan: PlanId, sticky: z.boolean(), 
 
 export async function updateAppSettings(db: Db, actor: Actor, slug: string, input: z.input<typeof AppSettings>): Promise<void> {
   assertCan(actor, { type: "app.manage" });
-  const settings = AppSettings.parse(input);
+  const settings = parseInput(AppSettings, input);
   await db.transaction(async (tx) => {
     const app = await requireApp(tx, slug);
     await tx.update(apps).set(settings).where(eq(apps.id, app.id));

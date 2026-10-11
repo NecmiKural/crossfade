@@ -62,4 +62,9 @@ describe("app administration", () => {
     const [shop] = await getDb().select().from(apps).where(eq(apps.slug, "shop"));
     expect(shop).toMatchObject({ defaultPlan: "cautious", sticky: false });
   });
+
+  it("rejects an unknown plan as invalid_request", async () => {
+    await adminCreateApp(getDb(), admin, { slug: "shop", key: "SHOP", domain: "localhost" });
+    await expect(updateAppSettings(getDb(), admin, "shop", { defaultPlan: "yolo" as never, sticky: true })).rejects.toMatchObject({ code: "invalid_request" });
+  });
 });
