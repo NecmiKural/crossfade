@@ -227,6 +227,19 @@ step("after recovery the good release is promoted and SHOP-1 resolves itself", a
   assert(bad.incident?.status === "resolved" && bad.incident.resolvedBy === "SHOP-R2", `SHOP-1 not resolved: ${JSON.stringify(bad.incident)}`);
 });
 
+// ---- console (commit 38) ----
+
+step("the server-rendered board shows the cards where the engine put them", async () => {
+  const html = await (await fetch(`${WEB}/board`, { headers: { cookie: session.cookie } })).text();
+  const card = (testId) => {
+    const start = html.indexOf(`data-testid="${testId}"`);
+    return start < 0 ? "" : html.slice(start, html.indexOf("</a>", start));
+  };
+  assert(card("release-SHOP-R1").includes("Rolled back"), "SHOP-R1 should be in Rolled back");
+  assert(card("release-SHOP-R2").includes("Promoted"), "SHOP-R2 should be in Promoted");
+  assert(card("incident-SHOP-1").includes("resolved by SHOP-R2"), "SHOP-1 should say resolved by SHOP-R2");
+});
+
 // ---- runner ----
 
 async function main() {
