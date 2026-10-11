@@ -47,3 +47,6 @@ next-env.d.ts
 # local tooling output
 .context/
 graphify-out/
+
+# sigmap output
+.github/copilot-instructions.md
