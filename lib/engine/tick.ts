@@ -3,6 +3,7 @@ import type { Plan } from "@/lib/core/plans";
 import type { Db, Tx } from "@/lib/db/client";
 import { apps, edgeNodes, heartbeats, releaseSamples, releases, snapshots, versions } from "@/lib/db/schema";
 import { decide } from "@/lib/engine/decide";
+import { holdMessage } from "@/lib/engine/holds";
 import { appendEvent } from "@/lib/events";
 import { clusterStats, type ParsedStats, parseStats, STATS_FILTER } from "@/lib/engine/stats";
 import type { Baseline, DecideInput, EngineStatus, HoldReason } from "@/lib/engine/types";
@@ -118,7 +119,7 @@ async function markFailed(db: Db, releaseId: string, error: unknown, now: Date):
       await tx.update(releases).set({ nextCheckAt: new Date(now.getTime() + RETRY_AFTER_FAILURE_MS) }).where(eq(releases.id, releaseId));
       return;
     }
-    const msg = "holding: the engine failed to process this release (see the engine log)";
+    const msg = `holding: ${holdMessage("engine_error")}`;
     await appendEvent(tx, { actor: ENGINE, appId: changed[0].appId, releaseId, type: "engine.hold", message: msg, data: { reason: "engine_error", error: message } });
   });
 }

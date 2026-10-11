@@ -3,6 +3,7 @@ import { releaseKey } from "@/lib/core/keys";
 import type { ActorRef } from "@/lib/core/policy";
 import type { Tx } from "@/lib/db/client";
 import { apps, type ReleaseStatus, releases } from "@/lib/db/schema";
+import { holdMessage } from "@/lib/engine/holds";
 import type { DecideResult, EventDraft, ReleaseState } from "@/lib/engine/types";
 import { appendEvent } from "@/lib/events";
 import { openOrLinkIncident, resolveIncidents } from "@/lib/releases/incidents";
@@ -12,23 +13,12 @@ export type ReleaseRow = typeof releases.$inferSelect;
 
 export const TERMINAL_STATUSES: readonly ReleaseStatus[] = ["promoted", "rolled_back", "cancelled"];
 
-const HOLD_MESSAGES: Record<string, string> = {
-  stats_unavailable: "holding: Envoy stats unavailable",
-  candidate_not_at_edge: "holding: candidate cluster not at the edge yet",
-  candidate_not_healthy: "holding: candidate not healthy yet",
-  edge_restarted: "holding: Envoy restarted moments ago",
-  no_live_edge: "holding: no Envoy node is polling",
-  suspected_nack: "holding: Envoy has not applied the step (suspected NACK, inferred from version_info)",
-  paused: "paused",
-  insufficient_data: "holding: not enough requests to judge",
-  awaiting_manual_advance: "waiting for a person to advance",
-  engine_error: "holding: the engine failed to process this release (see the engine log)",
-};
 
 /** One event when a hold starts or changes reason, not one every tick. */
 function holdEvents(before: ReleaseRow, after: ReleaseState): EventDraft[] {
   if (!after.holdReason || after.holdReason === before.holdReason) return [];
-  return [{ type: "engine.hold", message: HOLD_MESSAGES[after.holdReason] ?? after.holdReason, data: { reason: after.holdReason, ...after.holdDetail } }];
+  const message = after.holdReason === "paused" ? "paused" : `holding: ${holdMessage(after.holdReason)}`;
+  return [{ type: "engine.hold", message, data: { reason: after.holdReason, ...after.holdDetail } }];
 }
 
 /**
