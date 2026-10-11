@@ -3,7 +3,6 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp, registerVersion } from "@/lib/apps";
-import type { Actor } from "@/lib/core/policy";
 import { closeDb, getDb } from "@/lib/db/client";
 import { apps, events, releases, snapshots, user } from "@/lib/db/schema";
 import type { DecideResult } from "@/lib/engine/types";
@@ -13,7 +12,7 @@ import { resetDb } from "./helpers/db";
 
 const system = { kind: "system", id: "test" } as const;
 const engine = { kind: "engine", id: null } as const;
-const alice: Actor = { kind: "user", id: "u-alice", role: "user", readOnly: false };
+const alice = { kind: "user", id: "u-alice", role: "user", readOnly: false } as const;
 
 beforeEach(async () => {
   vi.stubEnv("UPSTREAM_ALLOWLIST", "shop=shop-v1:3000,shop-v2:3000,shop-v3:3000");
