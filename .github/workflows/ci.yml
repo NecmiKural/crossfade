@@ -56,7 +56,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - run: ./scripts/envoy-validate.sh envoy/fixtures/*.json
+      - run: ./scripts/envoy-validate.sh envoy/envoy.yaml envoy/envoy.behind-proxy.yaml envoy/fixtures/*.json
 
   docker-build:
     runs-on: ubuntu-latest

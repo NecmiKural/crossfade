@@ -55,7 +55,7 @@ services:
     <<: *golden
     ports:
       - "${DASHBOARD_BIND:-127.0.0.1}:3000:3000"
-    networks: [data]
+    networks: [data, control]
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -67,8 +67,29 @@ services:
       retries: 12
       start_period: 10s
 
+  envoy:
+    image: crossfade-envoy:local
+    build: ./envoy
+    # The wrapper runs as root to read the token, then the image entrypoint drops to the envoy user.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - 'exec /docker-entrypoint.sh envoy -c /etc/envoy/${ENVOY_BOOTSTRAP:-envoy.yaml} --config-yaml "node: {metadata: {xds_token: $$(cat /run/crossfade/xds_token)}}"'
+    volumes:
+      - secrets:/run/crossfade:ro
+    ports:
+      - "8080:8080"
+    networks: [control, apps]
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
 networks:
+  # data: db and the platform; control: platform and Envoy; apps: Envoy and your upstreams.
   data: {}
+  control: {}
+  apps:
+    name: crossfade_apps
 
 volumes:
   secrets: {}
