@@ -13,7 +13,7 @@ export type ReleasePageData = Readonly<{
   timeline: TimelineEntry[];
 }>;
 
-export async function releasePageData(db: Db, id: string): Promise<{ appSlug: string; data: ReleasePageData } | undefined> {
+export async function releasePageData(db: Db, id: string): Promise<{ appSlug: string; createdByUserId: string; data: ReleasePageData } | undefined> {
   const found = await releaseView(db, id);
   if (!found) return undefined;
   const recent = await db.select().from(releaseSamples).where(eq(releaseSamples.releaseId, id)).orderBy(desc(releaseSamples.id)).limit(SAMPLE_WINDOW);
@@ -22,5 +22,5 @@ export async function releasePageData(db: Db, id: string): Promise<{ appSlug: st
     .from(events)
     .where(eq(events.releaseId, id))
     .orderBy(asc(events.id));
-  return { appSlug: found.appSlug, data: { view: found.view, samples: recent.reverse(), timeline } };
+  return { appSlug: found.appSlug, createdByUserId: found.createdByUserId, data: { view: found.view, samples: recent.reverse(), timeline } };
 }

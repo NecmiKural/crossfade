@@ -4,16 +4,20 @@ import { z } from "zod";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { Panel } from "@/components/panel";
 import { ChannelStrip } from "@/components/release/channel-strip";
+import { Controls } from "@/components/release/controls";
 import { Crossfader } from "@/components/release/crossfader";
 import { EventTimeline } from "@/components/release/event-timeline";
 import { PhaseLamp } from "@/components/release/phase-lamp";
 import { StatusBadge } from "@/components/status-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { can } from "@/lib/core/policy";
+import type { Plan } from "@/lib/core/plans";
+import { type Actor, can } from "@/lib/core/policy";
 import { requireUser, userActor } from "@/lib/dal";
 import { getDb } from "@/lib/db/client";
 import type { ReleaseStatus } from "@/lib/db/schema";
+import { applyControl, type Control } from "@/lib/engine/actions";
 import { releasePageData } from "@/lib/releases/page";
+import type { ReleaseStatusView } from "@/lib/releases/view";
 import { channelSeries } from "@/lib/releases/samples";
 
 const FILL: Record<ReleaseStatus, string> = {
@@ -26,6 +30,18 @@ const FILL: Record<ReleaseStatus, string> = {
   cancelled: "bg-status-cancelled",
 };
 
+const CONTROLS: Control[] = ["approve", "advance", "pause", "resume", "promote", "abort"];
+
+/** Buttons a person may press now: valid for the release's state (applyControl) and allowed for them (can). */
+function availableControls(view: ReleaseStatusView, actor: Actor, app: string, createdBy: string): Control[] {
+  const release = { status: view.status, stepIndex: view.step.index, weight: view.step.weight, stepLiveAt: view.step.live ? new Date() : null, baseline: null, plan: view.plan as unknown as Plan };
+  const facts = { app, createdBy, requiresApproval: false };
+  return CONTROLS.filter((control) => {
+    if ("error" in applyControl(release, control)) return false;
+    return control === "approve" ? can(actor, { type: "release.approve", ...facts }) : can(actor, { type: "release.control", control, ...facts });
+  });
+}
+
 export default async function ReleasePage({ params }: PageProps<"/releases/[id]">) {
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) notFound();
@@ -33,6 +49,7 @@ export default async function ReleasePage({ params }: PageProps<"/releases/[id]"
   const found = await releasePageData(getDb(), id);
   if (!found || !can(userActor(user), { type: "release.read", app: found.appSlug })) notFound();
   const { view, samples, timeline } = found.data;
+  const available = availableControls(view, userActor(user), found.appSlug, found.createdByUserId);
   const series = channelSeries(samples);
   const outcome = view.outcome as { kind: string; reason: string; evidence: Record<string, unknown> } | null;
   return (
@@ -57,6 +74,8 @@ export default async function ReleasePage({ params }: PageProps<"/releases/[id]"
       </section>
 
       <PhaseLamp view={view} />
+
+      {view.terminal ? null : <Controls id={view.id} available={available} />}
 
       <div className="grid gap-4 md:grid-cols-2">
         <ChannelStrip role="Stable" version={view.from} {...series.stable} maxErrorRate={view.analysis.maxErrorRate} healthy={null} />

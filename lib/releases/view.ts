@@ -21,7 +21,7 @@ export type ReleaseStatusView = Readonly<{
   terminal: boolean;
   /** Every live Envoy node has acked the routes that carry this release's latest publish. */
   applied: boolean;
-  step: { index: number; count: number; weight: number; phase: "applying" | "baking" | "holding" | null; bakeRemainingSeconds: number | null };
+  step: { index: number; count: number; weight: number; live: boolean; phase: "applying" | "baking" | "holding" | null; bakeRemainingSeconds: number | null };
   hold: { reason: string; detail: unknown } | null;
   analysis: { n: number; errors: number; errorRate: number; minRequests: number; maxErrorRate: number };
   outcome: unknown;
@@ -52,7 +52,7 @@ async function incidentFor(db: Db, release: typeof releases.$inferSelect, appKey
 const candidateVersion = alias(versions, "candidate_version");
 
 /** Loads a release with what the status needs. Returns undefined for unknown ids. */
-export async function releaseView(db: Db, id: string, now = new Date()): Promise<{ appSlug: string; view: ReleaseStatusView } | undefined> {
+export async function releaseView(db: Db, id: string, now = new Date()): Promise<{ appSlug: string; createdByUserId: string; view: ReleaseStatusView } | undefined> {
   const [row] = await db
     .select({ release: releases, app: apps, from: fromVersion.name, candidate: candidateVersion.name, rdsVersion: snapshots.rdsVersion })
     .from(releases)
@@ -69,7 +69,7 @@ export async function releaseView(db: Db, id: string, now = new Date()): Promise
   const [sample] = await db.select().from(releaseSamples).where(eq(releaseSamples.releaseId, id)).orderBy(desc(releaseSamples.id)).limit(1);
   const applied = row.rdsVersion !== null && nodes.length > 0 && nodes.every((n) => (n.acked ?? -1) >= (row.rdsVersion ?? 0));
   const incident = await incidentFor(db, row.release, row.app.key);
-  return { appSlug: row.app.slug, view: buildView({ ...row, applied, sample, incident, now }) };
+  return { appSlug: row.app.slug, createdByUserId: row.release.createdByUserId, view: buildView({ ...row, applied, sample, incident, now }) };
 }
 
 type ViewInput = {
@@ -95,7 +95,7 @@ function stepOf(r: ViewInput["release"], plan: Plan, now: Date): ReleaseStatusVi
   const phase = terminal ? null : r.holdReason ? "holding" : r.stepLiveAt ? "baking" : r.publishedAt ? "applying" : null;
   const bake = plan.steps[r.stepIndex]?.bakeSeconds ?? 0;
   const remaining = r.stepLiveAt && r.status === "rolling" ? Math.max(0, Math.ceil(bake - (now.getTime() - r.stepLiveAt.getTime()) / 1000)) : null;
-  return { index: r.stepIndex, count: plan.steps.length, weight: r.weight, phase, bakeRemainingSeconds: remaining };
+  return { index: r.stepIndex, count: plan.steps.length, weight: r.weight, live: r.stepLiveAt !== null, phase, bakeRemainingSeconds: remaining };
 }
 
 export function buildView(input: ViewInput): ReleaseStatusView {
