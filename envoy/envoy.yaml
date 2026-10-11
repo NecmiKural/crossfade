@@ -1,8 +1,10 @@
 # Crossfade edge bootstrap (direct exposure). envoy.behind-proxy.yaml differs by exactly one line.
-# The xDS token is merged in at start: --config-yaml "node: {metadata: {xds_token: …}}".
+# __XDS_TOKEN__ is replaced by envoy/entrypoint.sh at start, so the token stays off the command line.
 node:
   id: edge-1
   cluster: crossfade-edge
+  metadata:
+    xds_token: "__XDS_TOKEN__"
 admin:
   address:
     socket_address: { address: 127.0.0.1, port_value: 9901 }
@@ -91,7 +93,8 @@ static_resources:
                   - name: envoy.filters.http.router
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-    # Not published. The engine reads per-cluster counters here; everything but GET /stats is a 404.
+    # Not published. The engine reads per-cluster counters here with the platform token;
+    # anything else (other paths, methods, or upstream containers without the token) gets a 404.
     - name: stats
       address:
         socket_address: { address: 0.0.0.0, port_value: 9902 }
@@ -112,6 +115,8 @@ static_resources:
                             headers:
                               - name: ":method"
                                 string_match: { exact: GET }
+                              - name: x-crossfade-stats
+                                string_match: { exact: "__XDS_TOKEN__" }
                           route: { cluster: envoy-admin }
                         - match: { prefix: / }
                           direct_response: { status: 404 }

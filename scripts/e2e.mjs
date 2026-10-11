@@ -86,12 +86,21 @@ step("xDS rejects a wrong node token", async () => {
   assert(res.status === 401, `expected 401, got ${res.status}`);
 });
 
-step("the stats listener only answers GET /stats", () => {
-  const statuses = inside(
-    "traffic",
-    `Promise.all([fetch("http://envoy:9902/stats",{method:"POST"}),fetch("http://envoy:9902/clusters"),fetch("http://envoy:9902/stats?filter=server.uptime")]).then(rs=>process.stdout.write(rs.map(r=>r.status).join(",")))`,
+step("the stats listener only answers GET /stats with the platform token", () => {
+  const token = compose(["exec", "-T", "web", "cat", "/run/crossfade/xds_token"], { capture: true });
+  const fromControl = inside(
+    "web",
+    `const h={"x-crossfade-stats":${JSON.stringify(token)}};Promise.all([fetch("http://envoy:9902/stats?filter=server.uptime",{headers:h}),fetch("http://envoy:9902/stats",{method:"POST",headers:h}),fetch("http://envoy:9902/clusters",{headers:h}),fetch("http://envoy:9902/stats")]).then(rs=>process.stdout.write(rs.map(r=>r.status).join(",")))`,
   );
-  assert(statuses === "404,404,200", `unexpected stats listener statuses: ${statuses}`);
+  assert(fromControl === "200,404,404,404", `unexpected stats listener statuses from web: ${fromControl}`);
+  const fromApps = inside("traffic", `fetch("http://envoy:9902/stats?filter=shop").then(r=>process.stdout.write(String(r.status)))`);
+  assert(fromApps === "404", `an upstream container must not read edge stats, got ${fromApps}`);
+});
+
+step("the xDS token is not on Envoy's command line", () => {
+  const token = compose(["exec", "-T", "web", "cat", "/run/crossfade/xds_token"], { capture: true });
+  const cmdline = compose(["exec", "-T", "envoy", "cat", "/proc/1/cmdline"], { capture: true });
+  assert(cmdline.includes("envoy") && !cmdline.includes(token), "the token leaked into Envoy's argv");
 });
 
 // ---- accounts (commit 17) ----
