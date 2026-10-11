@@ -122,11 +122,12 @@ export async function createRelease(db: Db, input: { id: string; body: unknown; 
     return await db.transaction((tx) => createInTx(tx, input.id, request, hash, input.actor));
   } catch (error) {
     const constraint = constraintOf(error);
-    if (constraint === "one_active_release_per_app") throw new AppError("active_release", "the app already has a release in progress");
-    if (constraint === "releases_pkey") {
-      // Two retries raced on the same id: the loser reports what the winner created.
+    if (constraint === "releases_pkey" || constraint === "one_active_release_per_app") {
+      // Two retries of the same request can race; whichever constraint fires first, the loser
+      // reports what the winner created. Only a genuinely different release is a conflict.
       const replay = await db.transaction((tx) => existingRelease(tx, input.id, hash, request.app));
-      return replay ?? { created: false, releaseId: input.id };
+      if (replay) return replay;
+      throw new AppError("active_release", "the app already has a release in progress");
     }
     throw error;
   }
