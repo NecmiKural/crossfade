@@ -1,9 +1,10 @@
 import { setTimeout as sleep } from "node:timers/promises";
+import { count } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import * as schema from "@/lib/db/schema";
-import { databaseUrl } from "@/lib/env";
+import { authUrl, databaseUrl, readSecret } from "@/lib/env";
 import { errorMessage, log } from "@/lib/log";
 import { publishSnapshot } from "@/lib/xds/publish";
 
@@ -24,6 +25,13 @@ async function connectWithRetry(url: string): Promise<postgres.Sql> {
   }
 }
 
+/** Until the first account exists, print the one-time setup URL (read it with `docker compose logs migrate`). */
+async function announceSetup(db: ReturnType<typeof drizzle<typeof schema>>): Promise<void> {
+  const [{ n }] = await db.select({ n: count() }).from(schema.user);
+  const token = readSecret("SETUP_TOKEN");
+  if (n === 0 && token) log("info", "first-run setup: open this URL to create the owner account", { url: `${authUrl()}/setup?token=${token}` });
+}
+
 async function main(): Promise<void> {
   const sql = await connectWithRetry(databaseUrl());
   try {
@@ -33,6 +41,7 @@ async function main(): Promise<void> {
     // Re-render on every deploy, so a changed renderer ("the template") reaches Envoy for every app at once.
     const snapshot = await db.transaction((tx) => publishSnapshot(tx, { reason: "migrate", actor: { kind: "system", id: null } }));
     log("info", "snapshot published", { rev: snapshot.id, cdsVersion: snapshot.cdsVersion, rdsVersion: snapshot.rdsVersion });
+    await announceSetup(db);
   } finally {
     await sql.end();
   }

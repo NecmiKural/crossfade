@@ -94,6 +94,37 @@ step("the stats listener only answers GET /stats", () => {
   assert(statuses === "404,404,200", `unexpected stats listener statuses: ${statuses}`);
 });
 
+// ---- accounts (commit 17) ----
+
+const owner = { name: "E2E Owner", email: "owner@e2e.test", password: "correct-horse-battery" };
+const jsonPost = (path, body, headers = {}) =>
+  fetch(`${WEB}${path}`, {
+    method: "POST",
+    // Node's fetch sends Sec-Fetch-Mode, so Better Auth also wants an Origin it trusts.
+    headers: { "content-type": "application/json", origin: WEB, ...headers },
+    body: JSON.stringify(body),
+  });
+
+step("first-run setup needs the one-time token and works exactly once", async () => {
+  const token = compose(["exec", "-T", "web", "cat", "/run/crossfade/setup_token"], { capture: true });
+  assert((await jsonPost("/api/setup", { ...owner, token: "wrong" })).status === 401, "a wrong setup token must be rejected");
+  const first = await jsonPost("/api/setup", { ...owner, token });
+  assert(first.status === 201, `expected 201 from setup, got ${first.status}: ${await first.text()}`);
+  const second = await jsonPost("/api/setup", { ...owner, email: "second@e2e.test", token });
+  assert(second.status === 403, `expected 403 on the second setup, got ${second.status}`);
+});
+
+step("public sign-up is disabled", async () => {
+  const res = await jsonPost("/api/auth/sign-up/email", { name: "Mallory", email: "m@e2e.test", password: "correct-horse-battery" });
+  assert(res.status === 400, `expected 400 from sign-up, got ${res.status}`);
+});
+
+step("the owner can sign in", async () => {
+  const res = await jsonPost("/api/auth/sign-in/email", { email: owner.email, password: owner.password });
+  assert(res.status === 200, `expected 200 from sign-in, got ${res.status}: ${await res.text()}`);
+  assert(/session_token/.test(res.headers.get("set-cookie") ?? ""), "sign-in must set a session cookie");
+});
+
 // ---- runner ----
 
 async function main() {

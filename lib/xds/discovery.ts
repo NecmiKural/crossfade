@@ -1,5 +1,5 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
+import { constantTimeEqual } from "@/lib/core/hash";
 import { renderRoutes } from "@/lib/xds/render";
 import { CLUSTER_TYPE, ROUTE_CONFIGURATION_TYPE } from "@/lib/xds/types";
 
@@ -63,12 +63,8 @@ export function parseDiscoveryRequest(body: unknown): { ok: true; request: Parse
   };
 }
 
-const digest = (value: string): Buffer => createHash("sha256").update(value).digest();
-
-/** Constant-time comparison; hashing first makes the lengths equal. */
 export function tokenMatches(expected: string, given: string | null): boolean {
-  if (given === null) return false;
-  return timingSafeEqual(digest(expected), digest(given));
+  return constantTimeEqual(expected, given);
 }
 
 export function parseVersion(versionInfo: string | null): number | null {

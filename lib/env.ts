@@ -36,3 +36,8 @@ export function upstreamAllowlist(): Allowlist {
   if (allowlistCache?.raw !== raw) allowlistCache = { raw, list: parseAllowlist(raw) };
   return allowlistCache.list;
 }
+
+/** The canonical dashboard origin. Cookies are issued for it only, never for the edge (:8080). */
+export function authUrl(): string {
+  return process.env.BETTER_AUTH_URL ?? "http://127.0.0.1:3000";
+}
