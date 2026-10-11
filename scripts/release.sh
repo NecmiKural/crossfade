@@ -25,6 +25,10 @@ timeout=${CROSSFADE_TIMEOUT:-7200}
 [ -n "${CROSSFADE_API_KEY:-}" ] || die "set CROSSFADE_API_KEY"
 command -v jq >/dev/null || die "jq is required"
 
+if [ -n "$upstream" ] && ! printf '%s' "$upstream" | grep -Eq '^[a-z][a-z0-9.-]*:[0-9]{1,5}$'; then
+  die "upstream must be host:port (lowercase host), got '$upstream'"
+fi
+
 id=$( (uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid) | tr 'A-Z' 'a-z')
 host=${upstream%:*}
 port=${upstream##*:}
@@ -47,6 +51,9 @@ deadline=$(($(date +%s) + timeout))
 last=""
 while [ "$(date +%s)" -lt "$deadline" ]; do
   code=$(curl -sS -D "$tmp/headers" -o "$tmp/body" -w '%{http_code}' "$url/api/v1/releases/$id" -H "x-api-key: $CROSSFADE_API_KEY") || code=000
+  case "$code" in
+    401 | 403 | 404) die "lost access to the release ($code): $(cat "$tmp/body")" ;;
+  esac
   if [ "$code" = 200 ]; then
     line=$(jq -r '"\(.status) \(.step.weight)% \(.step.phase // "") \(if .hold then "(" + .hold.reason + ")" else "" end)"' "$tmp/body")
     [ "$line" != "$last" ] && printf 'crossfade: %s\n' "$line" && last=$line
