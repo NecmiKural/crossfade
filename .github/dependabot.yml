@@ -13,6 +13,15 @@ updates:
       drizzle: { patterns: ["drizzle-orm", "drizzle-kit"] }
       vitest: { patterns: ["vitest", "@vitest/*", "vite"] }
       tailwind: { patterns: ["tailwindcss", "@tailwindcss/*"] }
+    ignore:
+      # Majors that need a coordinated bump: typescript-eslint caps TypeScript, eslint-config-next caps
+      # ESLint, and @types/node follows the Node major in .nvmrc.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: docker
     directories: ["/", "/envoy"]
