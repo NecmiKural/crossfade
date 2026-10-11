@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db/client";
 import { requireSecret } from "@/lib/env";
+import { readJson } from "@/lib/http";
 import { errorMessage, log } from "@/lib/log";
 import {
   discoveryResponse,
@@ -19,36 +20,6 @@ const empty = (status: number): Response => new Response(null, { status });
  */
 const MAX_BODY_BYTES = 1024 * 1024;
 
-/** Reads at most MAX_BODY_BYTES. Envoy sends REST polls chunked, so there may be no Content-Length. */
-async function readCapped(request: Request): Promise<string | null> {
-  if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES) return null;
-  const reader = request.body?.getReader();
-  if (!reader) return "";
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > MAX_BODY_BYTES) {
-      await reader.cancel();
-      return null;
-    }
-    chunks.push(value);
-  }
-  return Buffer.concat(chunks).toString("utf8");
-}
-
-async function readBody(request: Request): Promise<unknown | Response> {
-  const text = await readCapped(request);
-  if (text === null) return empty(413);
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return undefined;
-  }
-}
-
 /**
  * REST-JSON xDS for Envoy (POST /v3/discovery:clusters and /v3/discovery:routes).
  * Any non-200/304 answer makes Envoy keep its last good config and retry on the next poll.
@@ -57,8 +28,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ resource: 
   const kind = resourceKind((await ctx.params).resource);
   if (!kind) return empty(404);
 
-  const body = await readBody(request);
-  if (body instanceof Response) return body;
+  const body = await readJson(request, MAX_BODY_BYTES);
+  if (body === null) return empty(413);
   const parsed = parseDiscoveryRequest(body);
   if (!parsed.ok) return empty(400);
   if (!tokenMatches(requireSecret("XDS_TOKEN"), parsed.request.token)) return empty(401);
