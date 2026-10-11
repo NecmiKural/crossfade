@@ -1,0 +1,1 @@
+{"stats":[{"name":"cluster.shop--v1.membership_healthy","value":1},{"name":"cluster.shop--v1.upstream_rq_completed","value":960},{"name":"cluster.shop--v2.membership_healthy","value":1},{"name":"cluster.shop--v2.upstream_rq_5xx","value":17},{"name":"cluster.shop--v2.upstream_rq_completed","value":61},{"name":"server.uptime","value":25}]}
