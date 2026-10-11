@@ -1,8 +1,8 @@
-import { desc, eq, gt, and } from "drizzle-orm";
+import { and, desc, eq, gt } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { releaseKey } from "@/lib/core/keys";
 import type { Db } from "@/lib/db/client";
-import { apps, edgeNodes, heartbeats, type ReleaseStatus, releases, versions } from "@/lib/db/schema";
+import { apps, edgeNodes, heartbeats, type ReleaseStatus, releases, snapshots, versions } from "@/lib/db/schema";
 import { LIVE_NODE_WINDOW_MS } from "@/lib/releases/view";
 
 export type LampTone = "ok" | "warn" | "bad" | "off";
@@ -60,4 +60,32 @@ export async function recentReleases(db: Db, limit = 50): Promise<ReleaseSummary
     weight: r.release.weight,
     createdAt: r.release.createdAt,
   }));
+}
+
+export type EdgeNodeRow = Readonly<{
+  nodeId: string;
+  envoyVersion: string | null;
+  lastSeenAt: Date;
+  types: ReadonlyArray<{ type: "cds" | "rds"; acked: number | null; served: number; servedSince: Date; lastSeenAt: Date }>;
+}>;
+
+export async function edgeNodesOverview(db: Db): Promise<EdgeNodeRow[]> {
+  const rows = await db.select().from(edgeNodes);
+  const byNode = new Map<string, EdgeNodeRow>();
+  for (const row of rows) {
+    const existing = byNode.get(row.nodeId);
+    const entry = { type: row.type as "cds" | "rds", acked: row.ackedVersion, served: row.servedVersion, servedSince: row.servedSince, lastSeenAt: row.lastSeenAt };
+    byNode.set(row.nodeId, {
+      nodeId: row.nodeId,
+      envoyVersion: row.envoyVersion ?? existing?.envoyVersion ?? null,
+      lastSeenAt: existing && existing.lastSeenAt > row.lastSeenAt ? existing.lastSeenAt : row.lastSeenAt,
+      types: [...(existing?.types ?? []), entry].sort((a, b) => a.type.localeCompare(b.type)),
+    });
+  }
+  return [...byNode.values()].sort((a, b) => a.nodeId.localeCompare(b.nodeId));
+}
+
+export async function latestSnapshotDetail(db: Db): Promise<typeof snapshots.$inferSelect | undefined> {
+  const [row] = await db.select().from(snapshots).orderBy(desc(snapshots.id)).limit(1);
+  return row;
 }

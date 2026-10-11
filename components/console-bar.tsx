@@ -18,6 +18,7 @@ function LampChip({ lamp }: { lamp: Lamp }) {
 const NAV = [
   { href: "/board", label: "Board" },
   { href: "/apps", label: "Apps" },
+  { href: "/edge", label: "Edge" },
 ] as const;
 
 /** The console strip: brand, navigation, live lamps for the engine and the edge, and the user. */
