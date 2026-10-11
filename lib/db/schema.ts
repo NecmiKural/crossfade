@@ -16,6 +16,11 @@ import {
 } from "drizzle-orm/pg-core";
 
 const SLUG_SQL = "^[a-z0-9]+(-[a-z0-9]+)*$";
+// Mirrors lib/core/schemas.ts, so rows written outside the app still render to valid Envoy config.
+const LABEL_SQL = "[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?";
+const DOMAIN_SQL = `^${LABEL_SQL}(\\.${LABEL_SQL})*$`;
+const HOSTNAME_SQL = `^[a-z]([a-z0-9-]{0,61}[a-z0-9])?(\\.${LABEL_SQL})*$`;
+const HEALTH_PATH_SQL = "^/([A-Za-z0-9_~-][A-Za-z0-9._~-]*(/[A-Za-z0-9_~-][A-Za-z0-9._~-]*)*)?$";
 
 export const apps = pgTable(
   "apps",
@@ -37,6 +42,7 @@ export const apps = pgTable(
     unique("apps_domain_path_prefix_unique").on(t.domain, t.pathPrefix),
     check("apps_slug_format", sql.raw(`slug ~ '${SLUG_SQL}' AND length(slug) <= 40`)),
     check("apps_key_format", sql`${t.key} ~ '^[A-Z][A-Z0-9]{1,9}$'`),
+    check("apps_domain_format", sql.raw(`domain ~ '${DOMAIN_SQL}' AND length(domain) <= 253`)),
     check("apps_path_prefix_format", sql`${t.pathPrefix} ~ '^/$|^(/[A-Za-z0-9_~-][A-Za-z0-9._~-]*)+$'`),
     check("apps_default_plan", sql`${t.defaultPlan} IN ('demo', 'standard', 'cautious', 'manual')`),
     check("apps_tester_token_format", sql`${t.testerToken} ~ '^[0-9a-f]{64}$'`),
@@ -67,6 +73,8 @@ export const versions = pgTable(
     unique("versions_app_id_unique").on(t.appId, t.id),
     check("versions_name_format", sql.raw(`name ~ '${SLUG_SQL}' AND length(name) <= 30`)),
     check("versions_port_range", sql`${t.port} BETWEEN 1 AND 65535`),
+    check("versions_host_format", sql.raw(`host ~ '${HOSTNAME_SQL}' AND length(host) <= 253`)),
+    check("versions_health_path_format", sql.raw(`health_path ~ '${HEALTH_PATH_SQL}' AND length(health_path) <= 200`)),
   ],
 );
 

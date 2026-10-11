@@ -62,6 +62,14 @@ describe("catalog constraints", () => {
     expect(await pgErrorCode(insertVersion(shop.id, "V1"))).toBe(CHECK_VIOLATION);
   });
 
+  it("enforces domain, host and health path formats in the database too", async () => {
+    expect(await pgErrorCode(insertApp("shop", { domain: "Bad Domain" }))).toBe(CHECK_VIOLATION);
+    const blog = await insertApp("blog");
+    expect(await pgErrorCode(insertVersion(blog.id, "v1", { host: "127.0.0.1" }))).toBe(CHECK_VIOLATION);
+    expect(await pgErrorCode(insertVersion(blog.id, "v2", { healthPath: "/../etc" }))).toBe(CHECK_VIOLATION);
+    await expect(insertVersion(blog.id, "v3", { host: "blog-v3.apps", healthPath: "/status/ready" })).resolves.toBeDefined();
+  });
+
   it("deletes versions with their app", async () => {
     const shop = await insertApp("shop");
     await insertVersion(shop.id, "v1");

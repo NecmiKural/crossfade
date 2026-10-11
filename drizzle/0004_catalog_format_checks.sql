@@ -1,0 +1,3 @@
+ALTER TABLE "apps" ADD CONSTRAINT "apps_domain_format" CHECK (domain ~ '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$' AND length(domain) <= 253);--> statement-breakpoint
+ALTER TABLE "versions" ADD CONSTRAINT "versions_host_format" CHECK (host ~ '^[a-z]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$' AND length(host) <= 253);--> statement-breakpoint
+ALTER TABLE "versions" ADD CONSTRAINT "versions_health_path_format" CHECK (health_path ~ '^/([A-Za-z0-9_~-][A-Za-z0-9._~-]*(/[A-Za-z0-9_~-][A-Za-z0-9._~-]*)*)?$' AND length(health_path) <= 200);
