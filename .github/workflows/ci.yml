@@ -22,3 +22,18 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run coverage
+
+  docker-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Plant a throwaway .env that must not reach the image
+        run: echo "SHOULD_NOT_SHIP=1" > .env
+      - run: docker build -t crossfade:ci .
+      - name: Image contains no .env files
+        run: |
+          if docker run --rm --entrypoint sh crossfade:ci -c 'ls -a /app | grep -E "^\.env"'; then
+            echo "::error::.env file found in the image"
+            exit 1
+          fi
