@@ -11,8 +11,8 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["lib/core/**/*.ts", "lib/xds/**/*.ts", "lib/engine/**/*.ts"],
-      // publish.ts and tick.ts are database glue; they are covered by the db suite and the compose e2e instead.
-      exclude: ["**/*.test.ts", "lib/xds/publish.ts", "lib/engine/tick.ts"],
+      // Database glue is covered by the db suite and the compose e2e instead of this unit gate.
+      exclude: ["**/*.test.ts", "lib/xds/publish.ts", "lib/xds/edge-store.ts", "lib/engine/tick.ts"],
       thresholds: { lines: 80, branches: 80, functions: 80, statements: 80 },
     },
     projects: [

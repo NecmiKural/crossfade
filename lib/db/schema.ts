@@ -8,6 +8,7 @@ import {
   foreignKey,
   integer,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -89,4 +90,19 @@ export const snapshots = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check("snapshots_actor_kind", sql`${t.actorKind} IN ('user', 'apikey', 'engine', 'system')`)],
+);
+
+/** What each Envoy node last polled per resource type; acked < served means "still applying". */
+export const edgeNodes = pgTable(
+  "edge_nodes",
+  {
+    nodeId: text("node_id").notNull(),
+    type: text("type").notNull(),
+    ackedVersion: bigint("acked_version", { mode: "number" }),
+    servedVersion: bigint("served_version", { mode: "number" }).notNull(),
+    servedSince: timestamp("served_since", { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+    envoyVersion: text("envoy_version"),
+  },
+  (t) => [primaryKey({ columns: [t.nodeId, t.type] }), check("edge_nodes_type", sql`${t.type} IN ('cds', 'rds')`)],
 );

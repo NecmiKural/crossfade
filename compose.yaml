@@ -9,6 +9,7 @@ x-golden: &golden
   environment:
     DATABASE_URL: postgres://crossfade@db:5432/crossfade
     DATABASE_PASSWORD_FILE: /run/crossfade/pg_password
+    XDS_TOKEN_FILE: /run/crossfade/xds_token
 
 services:
   init:
@@ -19,7 +20,7 @@ services:
     command:
       - sh
       - -c
-      - umask 077; cd /run/crossfade && for f in pg_password; do [ -s $$f ] || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > $$f; done
+      - umask 077; cd /run/crossfade && for f in pg_password xds_token; do [ -s $$f ] || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > $$f; done
 
   db:
     image: postgres:18.6-alpine
