@@ -22,6 +22,7 @@ const HOLD_MESSAGES: Record<string, string> = {
   paused: "paused",
   insufficient_data: "holding: not enough requests to judge",
   awaiting_manual_advance: "waiting for a person to advance",
+  engine_error: "holding: the engine failed to process this release (see the engine log)",
 };
 
 /** One event when a hold starts or changes reason, not one every tick. */

@@ -78,3 +78,18 @@ describe("runTick", () => {
     expect(await runTick(getDb(), null)).toBe(0);
   });
 });
+
+describe("runTick failure handling", () => {
+  it("holds a release that fails to process as engine_error, once, and retries it later", async () => {
+    const spy = vi.spyOn(await import("@/lib/releases/apply"), "applyResult").mockRejectedValueOnce(new Error("boom"));
+    const now = new Date();
+    await runTick(getDb(), null, now);
+    spy.mockRestore();
+    const failed = (await getDb().select().from(releases)).filter((r) => r.holdReason === "engine_error");
+    expect(failed).toHaveLength(1);
+    expect(failed[0].holdDetail).toEqual({ error: "boom" });
+    expect(failed[0].nextCheckAt.getTime()).toBe(now.getTime() + 10_000);
+    const holds = await getDb().select().from(events).where(eq(events.releaseId, failed[0].id));
+    expect(holds.map((e) => e.type)).toEqual(["engine.hold"]);
+  });
+});

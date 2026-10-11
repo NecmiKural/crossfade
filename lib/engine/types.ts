@@ -23,7 +23,8 @@ export type HoldReason =
   | "suspected_nack"
   | "paused"
   | "insufficient_data"
-  | "awaiting_manual_advance";
+  | "awaiting_manual_advance"
+  | "engine_error";
 
 export type EngineStatus = "warming" | "rolling" | "paused";
 

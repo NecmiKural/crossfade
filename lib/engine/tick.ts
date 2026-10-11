@@ -1,8 +1,9 @@
-import { and, asc, eq, gt, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, lte, ne, or, isNull } from "drizzle-orm";
 import type { Plan } from "@/lib/core/plans";
 import type { Db, Tx } from "@/lib/db/client";
 import { apps, edgeNodes, heartbeats, releaseSamples, releases, snapshots, versions } from "@/lib/db/schema";
 import { decide } from "@/lib/engine/decide";
+import { appendEvent } from "@/lib/events";
 import { clusterStats, type ParsedStats, parseStats, STATS_FILTER } from "@/lib/engine/stats";
 import type { Baseline, DecideInput, EngineStatus, HoldReason } from "@/lib/engine/types";
 import { errorMessage, log } from "@/lib/log";
@@ -76,10 +77,11 @@ async function decideInput(tx: Tx, release: ReleaseRow, stats: ParsedStats | nul
   };
 }
 
-async function processOne(db: Db, stats: ParsedStats | null, edge: DecideInput["edge"], now: Date): Promise<string | null> {
+async function processOne(db: Db, stats: ParsedStats | null, edge: DecideInput["edge"], now: Date, claim: { id: string | null }): Promise<string | null> {
   return db.transaction(async (tx) => {
     const release = await claimDue(tx, now);
     if (!release) return null;
+    claim.id = release.id;
     const input = await decideInput(tx, release, stats, edge, now);
     const result = decide(input);
     await applyResult(tx, release, result, ENGINE);
@@ -101,21 +103,39 @@ async function processOne(db: Db, stats: ParsedStats | null, edge: DecideInput["
   });
 }
 
+/** A release whose processing threw: hold it visibly and retry later, without touching other rows. */
+async function markFailed(db: Db, releaseId: string, error: unknown, now: Date): Promise<void> {
+  const message = errorMessage(error);
+  await db.transaction(async (tx) => {
+    const changed = await tx
+      .update(releases)
+      .set({ holdReason: "engine_error", holdDetail: { error: message }, nextCheckAt: new Date(now.getTime() + RETRY_AFTER_FAILURE_MS) })
+      .where(and(eq(releases.id, releaseId), or(isNull(releases.holdReason), ne(releases.holdReason, "engine_error"))))
+      .returning({ appId: releases.appId });
+    if (changed.length === 0) {
+      await tx.update(releases).set({ nextCheckAt: new Date(now.getTime() + RETRY_AFTER_FAILURE_MS) }).where(eq(releases.id, releaseId));
+      return;
+    }
+    const msg = "holding: the engine failed to process this release (see the engine log)";
+    await appendEvent(tx, { actor: ENGINE, appId: changed[0].appId, releaseId, type: "engine.hold", message: msg, data: { reason: "engine_error", error: message } });
+  });
+}
+
 /** One engine tick: stats first (no locks held), then one short transaction per due release. */
 export async function runTick(db: Db, stats: ParsedStats | null, now = new Date()): Promise<number> {
   const edge = await edgeState(db, now);
   let processed = 0;
   while (processed < MAX_RELEASES_PER_TICK) {
+    const claim: { id: string | null } = { id: null };
     try {
-      const id = await processOne(db, stats, edge, now);
+      const id = await processOne(db, stats, edge, now, claim);
       if (!id) break;
-      processed++;
     } catch (error) {
-      log("error", "release tick failed", { error: errorMessage(error) });
-      // Push the oldest due release back so one bad row cannot spin the loop.
-      await db.execute(sql`UPDATE releases SET next_check_at = ${new Date(now.getTime() + RETRY_AFTER_FAILURE_MS)} WHERE id = (SELECT id FROM releases WHERE status IN ('warming', 'rolling', 'paused') AND next_check_at <= ${now} ORDER BY next_check_at LIMIT 1 FOR UPDATE SKIP LOCKED)`);
-      processed++;
+      log("error", "release tick failed", { release: claim.id, error: errorMessage(error) });
+      if (!claim.id) break;
+      await markFailed(db, claim.id, error, now);
     }
+    processed++;
   }
   await db.insert(heartbeats).values({ name: "engine", at: now }).onConflictDoUpdate({ target: heartbeats.name, set: { at: now } });
   return processed;
