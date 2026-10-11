@@ -71,6 +71,15 @@ services:
       retries: 12
       start_period: 10s
 
+  engine:
+    <<: *golden
+    command: ["node", "dist/engine.mjs"]
+    networks: [data, control]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   envoy:
     image: crossfade-envoy:local
     build: ./envoy
