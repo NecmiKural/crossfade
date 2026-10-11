@@ -168,6 +168,7 @@ These are worth knowing before you rely on Crossfade:
 - **Back up both volumes.** Back up the database volume and the `secrets` volume. Losing `secrets` locks you out of the database and logs everyone out.
 - **Mind the firewall.** Docker-published ports bypass `ufw`. Firewall at the host or provider level.
 - **Read the runbook.** [docs/RUNBOOK.md](docs/RUNBOOK.md) covers failure modes, release holds, secret rotation, backup and restore, and owner lockout.
+- **Read the threat model.** [SECURITY.md](SECURITY.md) lists what Crossfade defends against, its known limits, and how to report a vulnerability.
 
 ## Credits
 
