@@ -170,6 +170,10 @@ These are worth knowing before you rely on Crossfade:
 - **Read the runbook.** [docs/RUNBOOK.md](docs/RUNBOOK.md) covers failure modes, release holds, secret rotation, backup and restore, and owner lockout.
 - **Read the threat model.** [SECURITY.md](SECURITY.md) lists what Crossfade defends against, its known limits, and how to report a vulnerability.
 
+## Contributing
+
+Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the local setup, the checks CI runs, and how code here is written.
+
 ## Credits
 
 - **Vasilios Syrakis** ([vsyrakis.dev](https://vsyrakis.dev), [github.com/cetanu](https://github.com/cetanu)), whose talk is where the ideas here come from.
