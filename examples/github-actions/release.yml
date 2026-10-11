@@ -1,0 +1,54 @@
+# Example: progressive delivery from GitHub Actions through Crossfade.
+#
+# Blue/green slots: the operator allowlists two upstream slots per app, for example
+#   UPSTREAM_ALLOWLIST="shop=shop-blue:3000,shop-green:3000"
+# Each deploy starts the new build in the free slot (on the crossfade_apps Docker network), asks
+# Crossfade to roll it out, and only retires the old slot once the release is promoted.
+#
+# Reachability: the Crossfade API listens on 127.0.0.1 by default. Run this job on a self-hosted runner
+# on the Docker host, or reach the API through an SSH tunnel or VPN. Never expose it without auth in front.
+#
+# Secrets: CROSSFADE_URL (e.g. http://127.0.0.1:3000) and CROSSFADE_API_KEY (scoped to "shop").
+name: release
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-shop
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: [self-hosted]
+    timeout-minutes: 150
+    env:
+      CROSSFADE_URL: ${{ secrets.CROSSFADE_URL }}
+      CROSSFADE_API_KEY: ${{ secrets.CROSSFADE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Pick the free slot
+        id: slot
+        run: |
+          if docker ps --format '{{.Names}}' | grep -qx shop-blue; then echo "next=green" >> "$GITHUB_OUTPUT"; else echo "next=blue" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Start the candidate in the free slot
+        run: |
+          docker build -t "shop:${GITHUB_SHA::7}" .
+          docker rm -f "shop-${{ steps.slot.outputs.next }}" 2>/dev/null || true
+          docker run -d --name "shop-${{ steps.slot.outputs.next }}" --network crossfade_apps "shop:${GITHUB_SHA::7}"
+
+      - name: Roll out through Crossfade (exit 1 = rolled back)
+        run: ./scripts/release.sh shop "sha-${GITHUB_SHA::7}" "shop-${{ steps.slot.outputs.next }}:3000" standard
+
+      - name: Retire the previous slot
+        if: success()
+        run: |
+          previous=$([ "${{ steps.slot.outputs.next }}" = blue ] && echo green || echo blue)
+          docker rm -f "shop-$previous" 2>/dev/null || true
+
+      - name: Remove the failed candidate
+        if: failure()
+        run: docker rm -f "shop-${{ steps.slot.outputs.next }}" 2>/dev/null || true
