@@ -1,0 +1,34 @@
+# Weekly dependency updates. Versions are pinned exactly (.npmrc save-exact, image tags), so every
+# bump arrives as its own pull request and runs the full CI, including envoy-validate and the compose e2e.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      # Packages released together, which have to move together.
+      next: { patterns: ["next", "eslint-config-next", "@next/*"] }
+      react: { patterns: ["react", "react-dom", "@types/react", "@types/react-dom"] }
+      better-auth: { patterns: ["better-auth", "@better-auth/*", "auth"] }
+      drizzle: { patterns: ["drizzle-orm", "drizzle-kit"] }
+      vitest: { patterns: ["vitest", "@vitest/*", "vite"] }
+      tailwind: { patterns: ["tailwindcss", "@tailwindcss/*"] }
+
+  - package-ecosystem: docker
+    directories: ["/", "/envoy"]
+    schedule: { interval: weekly }
+    ignore:
+      # Node majors are moved deliberately, together with .nvmrc and the CI setup.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: { interval: weekly }
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
