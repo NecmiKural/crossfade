@@ -48,6 +48,13 @@ describe("databaseUrl", () => {
     expect(databaseUrl()).toBe("postgres://crossfade:p%40ss%2Fword@db:5432/crossfade");
   });
 
+  it("does not double-encode a password that contains a percent sign", () => {
+    vi.stubEnv("DATABASE_URL", "postgres://crossfade@db:5432/crossfade");
+    vi.stubEnv("DATABASE_PASSWORD", "100%sure");
+    vi.stubEnv("DATABASE_PASSWORD_FILE", "");
+    expect(decodeURIComponent(new URL(databaseUrl()).password)).toBe("100%sure");
+  });
+
   it("keeps the URL as is without a password secret", () => {
     vi.stubEnv("DATABASE_URL", "postgres://u:p@h:5432/d");
     vi.stubEnv("DATABASE_PASSWORD", "");

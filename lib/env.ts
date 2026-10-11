@@ -24,7 +24,8 @@ export function requireSecret(name: string): string {
 export function databaseUrl(): string {
   const url = new URL(requireSecret("DATABASE_URL"));
   const password = readSecret("DATABASE_PASSWORD");
-  if (password) url.password = encodeURIComponent(password);
+  // The URL setter percent-encodes by itself; encoding first would double-encode "%" and friends.
+  if (password) url.password = password;
   return url.toString();
 }
 
