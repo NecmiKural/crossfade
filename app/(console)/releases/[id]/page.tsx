@@ -7,6 +7,7 @@ import { ChannelStrip } from "@/components/release/channel-strip";
 import { Controls } from "@/components/release/controls";
 import { Crossfader } from "@/components/release/crossfader";
 import { EventTimeline } from "@/components/release/event-timeline";
+import { InspectPanel } from "@/components/release/inspect-panel";
 import { PhaseLamp } from "@/components/release/phase-lamp";
 import { StatusBadge } from "@/components/status-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -48,7 +49,7 @@ export default async function ReleasePage({ params }: PageProps<"/releases/[id]"
   const user = await requireUser();
   const found = await releasePageData(getDb(), id);
   if (!found || !can(userActor(user), { type: "release.read", app: found.appSlug })) notFound();
-  const { view, samples, timeline } = found.data;
+  const { view, inspect, samples, timeline } = found.data;
   const available = availableControls(view, userActor(user), found.appSlug, found.createdByUserId);
   const series = channelSeries(samples);
   const outcome = view.outcome as { kind: string; reason: string; evidence: Record<string, unknown> } | null;
@@ -85,12 +86,16 @@ export default async function ReleasePage({ params }: PageProps<"/releases/[id]"
       <Tabs defaultValue="timeline">
         <TabsList>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="inspect">Inspect</TabsTrigger>
           <TabsTrigger value="evidence">Evidence</TabsTrigger>
         </TabsList>
         <TabsContent value="timeline">
           <Panel legend="Timeline">
             <EventTimeline entries={timeline} />
           </Panel>
+        </TabsContent>
+        <TabsContent value="inspect">
+          <InspectPanel view={view} source={inspect} />
         </TabsContent>
         <TabsContent value="evidence">
           <Panel legend="Outcome">
