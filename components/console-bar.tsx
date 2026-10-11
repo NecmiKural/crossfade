@@ -20,6 +20,7 @@ const NAV = [
   { href: "/apps", label: "Apps" },
   { href: "/edge", label: "Edge" },
 ] as const;
+const ADMIN_NAV = [{ href: "/settings", label: "Settings" }] as const;
 
 /** The console strip: brand, navigation, live lamps for the engine and the edge, and the user. */
 export function ConsoleBar({ user, lamps }: { user: SessionUser; lamps: readonly Lamp[] }) {
@@ -30,7 +31,7 @@ export function ConsoleBar({ user, lamps }: { user: SessionUser; lamps: readonly
           <Wordmark className="text-base" />
         </Link>
         <nav aria-label="Main" className="flex items-center gap-4">
-          {NAV.map((item) => (
+          {[...NAV, ...(user.role === "admin" && !user.readOnly ? ADMIN_NAV : [])].map((item) => (
             <Link
               key={item.href}
               href={item.href}
