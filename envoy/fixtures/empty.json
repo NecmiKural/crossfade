@@ -1,0 +1,66 @@
+{
+  "node": {
+    "id": "validate",
+    "cluster": "crossfade-edge"
+  },
+  "static_resources": {
+    "clusters": [],
+    "listeners": [
+      {
+        "name": "edge",
+        "address": {
+          "socket_address": {
+            "address": "0.0.0.0",
+            "port_value": 8080
+          }
+        },
+        "filter_chains": [
+          {
+            "filters": [
+              {
+                "name": "envoy.filters.network.http_connection_manager",
+                "typed_config": {
+                  "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
+                  "stat_prefix": "edge",
+                  "route_config": {
+                    "name": "edge",
+                    "virtual_hosts": [
+                      {
+                        "name": "fallback",
+                        "domains": [
+                          "*"
+                        ],
+                        "routes": [
+                          {
+                            "name": "no-app",
+                            "match": {
+                              "prefix": "/"
+                            },
+                            "direct_response": {
+                              "status": 404,
+                              "body": {
+                                "inline_string": "crossfade: no app for this host\n"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "http_filters": [
+                    {
+                      "name": "envoy.filters.http.router",
+                      "typed_config": {
+                        "@type": "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

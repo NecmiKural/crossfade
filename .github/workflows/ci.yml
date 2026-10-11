@@ -51,6 +51,13 @@ jobs:
       - run: npm ci
       - run: npm run test:db
 
+  envoy-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - run: ./scripts/envoy-validate.sh envoy/fixtures/*.json
+
   docker-build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
