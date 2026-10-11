@@ -1,3 +1,4 @@
+import { apiKey } from "@better-auth/api-key";
 import type { BetterAuthOptions } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
@@ -14,6 +15,15 @@ export const baseAuthOptions = {
     minPasswordLength: 12,
     maxPasswordLength: 128,
   },
-  // nextCookies must stay last so Server Actions can set the session cookie.
-  plugins: [admin(), nextCookies()],
+  plugins: [
+    admin(),
+    apiKey({
+      defaultPrefix: "cf_",
+      // The plugin defaults to 10 requests per day per key, and every allowed call extends the window,
+      // so a CI job polling a release would be locked out for good. Keys are scoped per app instead.
+      rateLimit: { enabled: false },
+    }),
+    // nextCookies must stay last so Server Actions can set the session cookie.
+    nextCookies(),
+  ],
 } satisfies Partial<BetterAuthOptions>;

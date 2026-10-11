@@ -6,7 +6,7 @@ const testDatabaseUrl =
   process.env.TEST_DATABASE_URL ?? "postgres://crossfade:crossfade-dev-only@127.0.0.1:5432/crossfade_test";
 
 export default defineConfig({
-  resolve: { alias: { "@": root } },
+  resolve: { alias: { "@": root, "server-only": `${root}tests/helpers/empty.ts` } },
   test: {
     coverage: {
       provider: "v8",
