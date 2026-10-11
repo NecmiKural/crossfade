@@ -38,6 +38,8 @@ export const apps = pgTable(
     stableVersionId: uuid("stable_version_id"),
     defaultPlan: text("default_plan").$type<PlanId>().notNull().default("standard"),
     sticky: boolean("sticky").notNull().default(true),
+    /** Four-eyes: releases wait in pending_approval until someone other than their creator approves. */
+    requiresApproval: boolean("requires_approval").notNull().default(false),
     testerToken: text("tester_token").notNull(),
     releaseSeq: integer("release_seq").notNull().default(0),
     issueSeq: integer("issue_seq").notNull().default(0),

@@ -29,6 +29,7 @@ export default async function AppPage({ params }: PageProps<"/apps/[slug]">) {
         <p className="font-mono text-xs text-muted-foreground">
           {app.domain}
           {app.pathPrefix} · default plan {app.defaultPlan} · {app.sticky ? "sticky" : "random"} split
+          {app.requiresApproval ? " · four-eyes approval" : ""}
         </p>
         {user.readOnly ? null : (
           <Link href={`/releases/new?app=${app.slug}`} className={buttonVariants({ size: "sm", className: "mt-2" })}>
@@ -69,7 +70,7 @@ export default async function AppPage({ params }: PageProps<"/apps/[slug]">) {
           </Panel>
           <div className="space-y-6">
             <Panel legend="Settings">
-              <AppSettingsForm app={app.slug} defaultPlan={app.defaultPlan} sticky={app.sticky} />
+              <AppSettingsForm app={app.slug} defaultPlan={app.defaultPlan} sticky={app.sticky} requiresApproval={app.requiresApproval} />
             </Panel>
             <Panel legend="Tester token">
               <p className="mb-3 text-sm text-muted-foreground">

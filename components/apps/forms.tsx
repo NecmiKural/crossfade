@@ -57,7 +57,7 @@ export function RegisterVersionForm({ app }: { app: string }) {
   );
 }
 
-export function AppSettingsForm({ app, defaultPlan, sticky }: { app: string; defaultPlan: string; sticky: boolean }) {
+export function AppSettingsForm({ app, defaultPlan, sticky, requiresApproval }: { app: string; defaultPlan: string; sticky: boolean; requiresApproval: boolean }) {
   return (
     <ActionForm action={updateSettingsAction} submitLabel="Save settings">
       <input type="hidden" name="app" value={app} />
@@ -66,6 +66,13 @@ export function AppSettingsForm({ app, defaultPlan, sticky }: { app: string; def
         <input type="checkbox" name="sticky" defaultChecked={sticky} className="mt-0.5 size-4 accent-[var(--primary)]" />
         <span>
           Sticky split <span className="block text-xs text-muted-foreground">Each client stays on one version for the whole rollout.</span>
+        </span>
+      </label>
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" name="requiresApproval" defaultChecked={requiresApproval} className="mt-0.5 size-4 accent-[var(--primary)]" />
+        <span>
+          Four-eyes approval{" "}
+          <span className="block text-xs text-muted-foreground">Releases wait until someone other than their creator approves; the creator cannot advance or promote them.</span>
         </span>
       </label>
     </ActionForm>

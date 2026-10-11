@@ -50,7 +50,7 @@ export async function adminRegisterVersion(db: Db, actor: Actor, input: z.input<
   return db.transaction((tx) => registerVersion(tx, input, actorRef(actor)));
 }
 
-export const AppSettings = z.object({ defaultPlan: PlanId, sticky: z.boolean() });
+export const AppSettings = z.object({ defaultPlan: PlanId, sticky: z.boolean(), requiresApproval: z.boolean().default(false) });
 
 export async function updateAppSettings(db: Db, actor: Actor, slug: string, input: z.input<typeof AppSettings>): Promise<void> {
   assertCan(actor, { type: "app.manage" });
@@ -58,7 +58,8 @@ export async function updateAppSettings(db: Db, actor: Actor, slug: string, inpu
   await db.transaction(async (tx) => {
     const app = await requireApp(tx, slug);
     await tx.update(apps).set(settings).where(eq(apps.id, app.id));
-    const message = `settings changed: default plan ${settings.defaultPlan}, ${settings.sticky ? "sticky" : "random"} split`;
+    const approvals = settings.requiresApproval ? "four-eyes approval on" : "four-eyes approval off";
+    const message = `settings changed: default plan ${settings.defaultPlan}, ${settings.sticky ? "sticky" : "random"} split, ${approvals}`;
     await appendEvent(tx, { actor: actorRef(actor), appId: app.id, type: "app.updated", message, data: settings });
     await publishSnapshot(tx, { reason: `app ${slug} settings`, actor: actorRef(actor) });
   });

@@ -78,14 +78,14 @@ async function insertRelease(tx: Tx, args: { id: string; app: AppRow; candidate:
     fromVersionId: app.stableVersionId,
     candidateVersionId: candidate.id,
     plan: PLANS[planId],
-    status: "warming",
+    status: app.requiresApproval ? "pending_approval" : "warming",
     notes: request.notes ?? null,
     requestHash: args.hash,
     createdByKind: actor.kind,
     createdByUserId: actor.kind === "user" ? actor.id : actor.ownerId,
     createdViaKeyId: actor.kind === "apikey" ? actor.id : null,
   });
-  return { number, planId };
+  return { number, planId, pending: app.requiresApproval };
 }
 
 async function createInTx(tx: Tx, id: string, request: ReleaseRequestInput, hash: string, actor: Creator): Promise<CreateResult> {
@@ -97,14 +97,15 @@ async function createInTx(tx: Tx, id: string, request: ReleaseRequestInput, hash
   const app = await lockApp(tx, found);
   const candidate = await resolveCandidate(tx, app, request, ref);
   const current = (await findApp(tx, app.slug)) ?? app;
-  const { number, planId } = await insertRelease(tx, { id, app: current, candidate, request, hash, actor });
+  const { number, planId, pending } = await insertRelease(tx, { id, app: current, candidate, request, hash, actor });
   const key = releaseKey(app.key, number);
+  const waiting = pending ? "; waiting for approval by a second person" : "";
   await appendEvent(tx, {
     actor: ref,
     appId: app.id,
     releaseId: id,
     type: "release.created",
-    message: `${key} created: ${candidate.name} with the ${planId} plan`,
+    message: `${key} created: ${candidate.name} with the ${planId} plan${waiting}`,
     data: { plan: planId, candidate: candidate.name, notes: request.notes ?? null },
   });
   const snapshot = await publishSnapshot(tx, { reason: `${key} created`, actor: ref });

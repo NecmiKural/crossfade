@@ -1,0 +1,1 @@
+ALTER TABLE "apps" ADD COLUMN "requires_approval" boolean DEFAULT false NOT NULL;

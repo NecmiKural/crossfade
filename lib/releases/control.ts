@@ -16,8 +16,8 @@ export async function controlRelease(db: Db, input: { id: string; control: Contr
   return db.transaction(async (tx) => {
     const [row] = await tx.select().from(releases).where(eq(releases.id, input.id)).for("update");
     if (!row) throw new AppError("not_found", "release not found");
-    const [app] = await tx.select({ slug: apps.slug }).from(apps).where(eq(apps.id, row.appId));
-    const facts = { app: app.slug, createdBy: row.createdByUserId, requiresApproval: false };
+    const [app] = await tx.select({ slug: apps.slug, requiresApproval: apps.requiresApproval }).from(apps).where(eq(apps.id, row.appId));
+    const facts = { app: app.slug, createdBy: row.createdByUserId, requiresApproval: app.requiresApproval };
     const allowed =
       input.control === "approve"
         ? can(input.actor, { type: "release.approve", ...facts })

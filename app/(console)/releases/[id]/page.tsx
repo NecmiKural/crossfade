@@ -34,9 +34,9 @@ const FILL: Record<ReleaseStatus, string> = {
 const CONTROLS: Control[] = ["approve", "advance", "pause", "resume", "promote", "abort"];
 
 /** Buttons a person may press now: valid for the release's state (applyControl) and allowed for them (can). */
-function availableControls(view: ReleaseStatusView, actor: Actor, app: string, createdBy: string): Control[] {
+function availableControls(view: ReleaseStatusView, actor: Actor, app: string, createdBy: string, requiresApproval: boolean): Control[] {
   const release = { status: view.status, stepIndex: view.step.index, weight: view.step.weight, stepLiveAt: view.step.live ? new Date() : null, baseline: null, plan: view.plan as unknown as Plan };
-  const facts = { app, createdBy, requiresApproval: false };
+  const facts = { app, createdBy, requiresApproval };
   return CONTROLS.filter((control) => {
     if ("error" in applyControl(release, control)) return false;
     return control === "approve" ? can(actor, { type: "release.approve", ...facts }) : can(actor, { type: "release.control", control, ...facts });
@@ -50,7 +50,7 @@ export default async function ReleasePage({ params }: PageProps<"/releases/[id]"
   const found = await releasePageData(getDb(), id);
   if (!found || !can(userActor(user), { type: "release.read", app: found.appSlug })) notFound();
   const { view, inspect, samples, timeline } = found.data;
-  const available = availableControls(view, userActor(user), found.appSlug, found.createdByUserId);
+  const available = availableControls(view, userActor(user), found.appSlug, found.createdByUserId, inspect.requiresApproval);
   const series = channelSeries(samples);
   const outcome = view.outcome as { kind: string; reason: string; evidence: Record<string, unknown> } | null;
   return (

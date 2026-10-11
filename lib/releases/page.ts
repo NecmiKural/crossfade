@@ -11,6 +11,7 @@ export type InspectSource = Readonly<{
   domain: string;
   pathPrefix: string;
   sticky: boolean;
+  requiresApproval: boolean;
   snapshot: { id: number; cdsVersion: number; rdsVersion: number; clusters: string; routes: string } | null;
 }>;
 
@@ -31,7 +32,7 @@ export async function releasePageData(db: Db, id: string): Promise<{ appSlug: st
     .where(eq(events.releaseId, id))
     .orderBy(asc(events.id));
   const [source] = await db
-    .select({ domain: apps.domain, pathPrefix: apps.pathPrefix, sticky: apps.sticky, snapshot: snapshots })
+    .select({ domain: apps.domain, pathPrefix: apps.pathPrefix, sticky: apps.sticky, requiresApproval: apps.requiresApproval, snapshot: snapshots })
     .from(releases)
     .innerJoin(apps, eq(apps.id, releases.appId))
     .leftJoin(snapshots, eq(snapshots.id, releases.snapshotId))
@@ -41,6 +42,7 @@ export async function releasePageData(db: Db, id: string): Promise<{ appSlug: st
     domain: source.domain,
     pathPrefix: source.pathPrefix,
     sticky: source.sticky,
+    requiresApproval: source.requiresApproval,
     snapshot: snap ? { id: snap.id, cdsVersion: snap.cdsVersion, rdsVersion: snap.rdsVersion, clusters: snap.clusters, routes: snap.routes } : null,
   };
   return { appSlug: found.appSlug, createdByUserId: found.createdByUserId, data: { view: found.view, inspect, samples: recent.reverse(), timeline } };

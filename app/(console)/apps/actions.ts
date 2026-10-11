@@ -44,7 +44,11 @@ export async function registerVersionAction(_state: FormState, form: FormData): 
 export async function updateSettingsAction(_state: FormState, form: FormData): Promise<FormState> {
   const app = field(form, "app");
   try {
-    await updateAppSettings(getDb(), await actor(), app, { defaultPlan: field(form, "defaultPlan") as "standard", sticky: form.get("sticky") === "on" });
+    await updateAppSettings(getDb(), await actor(), app, {
+      defaultPlan: field(form, "defaultPlan") as "standard",
+      sticky: form.get("sticky") === "on",
+      requiresApproval: form.get("requiresApproval") === "on",
+    });
     revalidatePath(`/apps/${app}`);
     return { ok: true, message: "Settings saved." };
   } catch (error) {
