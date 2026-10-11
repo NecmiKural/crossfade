@@ -50,7 +50,7 @@ describe("catalog constraints", () => {
     ["slug with a double dash", () => insertApp("shop--x")],
     ["lowercase key", () => insertApp("shop", { key: "shop" })],
     ["path prefix with a trailing slash", () => insertApp("shop", { pathPrefix: "/api/" })],
-    ["unknown default plan", () => insertApp("shop", { defaultPlan: "yolo" })],
+    ["unknown default plan", () => insertApp("shop", { defaultPlan: "yolo" as never })],
     ["malformed tester token", () => insertApp("shop", { testerToken: "abc" })],
   ])("enforces CHECK: %s", async (_name, insert) => {
     expect(await pgErrorCode(insert())).toBe(CHECK_VIOLATION);

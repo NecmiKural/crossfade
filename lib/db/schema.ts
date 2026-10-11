@@ -17,6 +17,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { PlanId } from "@/lib/core/plans";
 import { user } from "@/lib/db/auth-schema";
 
 const SLUG_SQL = "^[a-z0-9]+(-[a-z0-9]+)*$";
@@ -35,7 +36,7 @@ export const apps = pgTable(
     domain: text("domain").notNull(),
     pathPrefix: text("path_prefix").notNull().default("/"),
     stableVersionId: uuid("stable_version_id"),
-    defaultPlan: text("default_plan").notNull().default("standard"),
+    defaultPlan: text("default_plan").$type<PlanId>().notNull().default("standard"),
     sticky: boolean("sticky").notNull().default(true),
     testerToken: text("tester_token").notNull(),
     releaseSeq: integer("release_seq").notNull().default(0),
