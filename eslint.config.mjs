@@ -8,6 +8,7 @@ const eslintConfig = defineConfig([
   {
     rules: {
       "no-console": "error",
+      "@typescript-eslint/no-unused-vars": ["error", { ignoreRestSiblings: true, argsIgnorePattern: "^_" }],
     },
   },
   globalIgnores([".next/**", "out/**", "build/**", "dist/**", "coverage/**", "next-env.d.ts"]),
