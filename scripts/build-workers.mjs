@@ -1,7 +1,7 @@
 // Bundles the non-Next entrypoints into self-contained ESM files that run from the golden image.
 import { build } from "esbuild";
 
-const entryPoints = ["workers/migrate.ts"];
+const entryPoints = ["workers/migrate.ts", "workers/seed.ts"];
 
 await build({
   entryPoints,

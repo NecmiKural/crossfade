@@ -10,6 +10,7 @@ x-golden: &golden
     DATABASE_URL: postgres://crossfade@db:5432/crossfade
     DATABASE_PASSWORD_FILE: /run/crossfade/pg_password
     XDS_TOKEN_FILE: /run/crossfade/xds_token
+    UPSTREAM_ALLOWLIST: ${UPSTREAM_ALLOWLIST:-shop=shop-v1:3000,shop-v2:3000,shop-v3:3000}
 
 services:
   init:
@@ -83,6 +84,50 @@ services:
       web:
         condition: service_healthy
     restart: unless-stopped
+
+  # ---- demo profile: `docker compose --profile demo up` ----
+  shop-v1:
+    profiles: [demo]
+    image: crossfade-demo:local
+    build: ./demo
+    init: true
+    environment: { VERSION: v1, COLOR: "#2563eb" }
+    networks: [apps]
+  shop-v2:
+    profiles: [demo]
+    image: crossfade-demo:local
+    build: ./demo
+    init: true
+    # Healthy on /healthz, but 30% of real requests fail.
+    environment: { VERSION: v2, COLOR: "#16a34a", ERROR_RATE: "0.3" }
+    networks: [apps]
+  shop-v3:
+    profiles: [demo]
+    image: crossfade-demo:local
+    build: ./demo
+    init: true
+    environment: { VERSION: v3, COLOR: "#9333ea" }
+    networks: [apps]
+  demo-seed:
+    <<: *golden
+    profiles: [demo]
+    command: ["node", "dist/seed.mjs"]
+    networks: [data]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  traffic:
+    profiles: [demo]
+    image: crossfade-demo:local
+    build: ./demo
+    init: true
+    command: ["node", "traffic.mjs"]
+    networks: [apps]
+    depends_on:
+      demo-seed:
+        condition: service_completed_successfully
+      envoy:
+        condition: service_started
 
 networks:
   # data: db and the platform; control: platform and Envoy; apps: Envoy and your upstreams.

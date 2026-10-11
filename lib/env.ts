@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { type Allowlist, parseAllowlist } from "@/lib/core/allowlist";
 
 /**
  * Reads NAME from the environment, or the file named by NAME_FILE (Docker secrets style).
@@ -25,4 +26,13 @@ export function databaseUrl(): string {
   const password = readSecret("DATABASE_PASSWORD");
   if (password) url.password = encodeURIComponent(password);
   return url.toString();
+}
+
+let allowlistCache: { raw: string; list: Allowlist } | undefined;
+
+/** The operator's per-app upstream allowlist (UPSTREAM_ALLOWLIST). Unset means deny everything. */
+export function upstreamAllowlist(): Allowlist {
+  const raw = process.env.UPSTREAM_ALLOWLIST ?? "";
+  if (allowlistCache?.raw !== raw) allowlistCache = { raw, list: parseAllowlist(raw) };
+  return allowlistCache.list;
 }
