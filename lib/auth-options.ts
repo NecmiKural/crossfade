@@ -8,6 +8,16 @@ import { admin } from "better-auth/plugins";
  * No database, secrets or env reads here, so importing it is side-effect free.
  */
 export const baseAuthOptions = {
+  advanced: {
+    // The dashboard is reached directly (127.0.0.1 by default), so any X-Forwarded-For is client-chosen.
+    // Ignoring it puts sign-in attempts in one shared bucket instead of one per spoofed address.
+    // Behind a proxy that overwrites a header, list that header here instead.
+    ipAddress: { ipAddressHeaders: [] },
+  },
+  rateLimit: {
+    enabled: true,
+    customRules: { "/sign-in/email": { window: 60, max: 10 } },
+  },
   emailAndPassword: {
     enabled: true,
     // Accounts are created only by the first-run setup or by an admin (ADR-0004).
