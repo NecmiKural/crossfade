@@ -10,10 +10,13 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run --project unit",
     "test:db": "vitest run --project db",
-    "coverage": "vitest run --project unit --coverage"
+    "coverage": "vitest run --project unit --coverage",
+    "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "drizzle-orm": "0.45.4",
     "next": "16.4.0",
+    "postgres": "3.4.9",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "zod": "4.6.5"
@@ -24,6 +27,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitest/coverage-v8": "5.0.3",
+    "drizzle-kit": "0.31.11",
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.0",
     "tailwindcss": "4.3.3",

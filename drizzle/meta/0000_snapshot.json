@@ -1,0 +1,269 @@
+{
+  "id": "789d419f-3bc7-4792-a5af-de601ffecb28",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.apps": {
+      "name": "apps",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "domain": {
+          "name": "domain",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "path_prefix": {
+          "name": "path_prefix",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'/'"
+        },
+        "stable_version_id": {
+          "name": "stable_version_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_plan": {
+          "name": "default_plan",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'standard'"
+        },
+        "sticky": {
+          "name": "sticky",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "tester_token": {
+          "name": "tester_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "release_seq": {
+          "name": "release_seq",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "issue_seq": {
+          "name": "issue_seq",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "apps_stable_version_fk": {
+          "name": "apps_stable_version_fk",
+          "tableFrom": "apps",
+          "tableTo": "versions",
+          "columnsFrom": [
+            "id",
+            "stable_version_id"
+          ],
+          "columnsTo": [
+            "app_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "apps_slug_unique": {
+          "name": "apps_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        },
+        "apps_key_unique": {
+          "name": "apps_key_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "key"
+          ]
+        },
+        "apps_domain_path_prefix_unique": {
+          "name": "apps_domain_path_prefix_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "domain",
+            "path_prefix"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "apps_slug_format": {
+          "name": "apps_slug_format",
+          "value": "slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND length(slug) <= 40"
+        },
+        "apps_key_format": {
+          "name": "apps_key_format",
+          "value": "\"apps\".\"key\" ~ '^[A-Z][A-Z0-9]{1,9}$'"
+        },
+        "apps_path_prefix_format": {
+          "name": "apps_path_prefix_format",
+          "value": "\"apps\".\"path_prefix\" ~ '^/$|^(/[A-Za-z0-9_~-][A-Za-z0-9._~-]*)+$'"
+        },
+        "apps_default_plan": {
+          "name": "apps_default_plan",
+          "value": "\"apps\".\"default_plan\" IN ('demo', 'standard', 'cautious', 'manual')"
+        },
+        "apps_tester_token_format": {
+          "name": "apps_tester_token_format",
+          "value": "\"apps\".\"tester_token\" ~ '^[0-9a-f]{64}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.versions": {
+      "name": "versions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "app_id": {
+          "name": "app_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "host": {
+          "name": "host",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "port": {
+          "name": "port",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "health_path": {
+          "name": "health_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'/healthz'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "versions_app_id_apps_id_fk": {
+          "name": "versions_app_id_apps_id_fk",
+          "tableFrom": "versions",
+          "tableTo": "apps",
+          "columnsFrom": [
+            "app_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "versions_app_name_unique": {
+          "name": "versions_app_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "app_id",
+            "name"
+          ]
+        },
+        "versions_app_id_unique": {
+          "name": "versions_app_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "app_id",
+            "id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "versions_name_format": {
+          "name": "versions_name_format",
+          "value": "name ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND length(name) <= 30"
+        },
+        "versions_port_range": {
+          "name": "versions_port_range",
+          "value": "\"versions\".\"port\" BETWEEN 1 AND 65535"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

@@ -2,14 +2,16 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
+const testDatabaseUrl =
+  process.env.TEST_DATABASE_URL ?? "postgres://crossfade:crossfade-dev-only@127.0.0.1:5432/crossfade_test";
 
 export default defineConfig({
   resolve: { alias: { "@": root } },
   test: {
-    passWithNoTests: true,
     coverage: {
       provider: "v8",
       include: ["lib/core/**/*.ts", "lib/xds/**/*.ts", "lib/engine/**/*.ts"],
+      // publish.ts and tick.ts are database glue; they are covered by the db suite and the compose e2e instead.
       exclude: ["**/*.test.ts", "lib/xds/publish.ts", "lib/engine/tick.ts"],
       thresholds: { lines: 80, branches: 80, functions: 80, statements: 80 },
     },
@@ -27,6 +29,8 @@ export default defineConfig({
         test: {
           name: "db",
           include: ["tests/**/*.db.test.ts"],
+          globalSetup: ["tests/global-setup.ts"],
+          env: { DATABASE_URL: testDatabaseUrl, TEST_DATABASE_URL: testDatabaseUrl },
           fileParallelism: false,
         },
       },

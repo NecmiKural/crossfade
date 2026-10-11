@@ -23,6 +23,34 @@ jobs:
       - run: npm run typecheck
       - run: npm run coverage
 
+  db-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_USER: crossfade
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: crossfade_test
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U crossfade"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 30
+    env:
+      TEST_DATABASE_URL: postgres://crossfade:ci-only@127.0.0.1:5432/crossfade_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test:db
+
   docker-build:
     runs-on: ubuntu-latest
     timeout-minutes: 20

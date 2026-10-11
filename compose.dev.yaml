@@ -1,0 +1,23 @@
+# Local development only: a Postgres for `next dev` and the db test suite (which creates crossfade_test itself).
+# The credentials below are deliberately dev-only and the port is bound to 127.0.0.1.
+name: crossfade-dev
+
+services:
+  db:
+    image: postgres:18.6-alpine
+    environment:
+      POSTGRES_USER: crossfade
+      POSTGRES_PASSWORD: crossfade-dev-only
+      POSTGRES_DB: crossfade
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - dev-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "crossfade"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+volumes:
+  dev-db:
