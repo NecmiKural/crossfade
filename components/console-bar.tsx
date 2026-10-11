@@ -15,7 +15,10 @@ function LampChip({ lamp }: { lamp: Lamp }) {
   );
 }
 
-const NAV = [{ href: "/board", label: "Board" }] as const;
+const NAV = [
+  { href: "/board", label: "Board" },
+  { href: "/apps", label: "Apps" },
+] as const;
 
 /** The console strip: brand, navigation, live lamps for the engine and the edge, and the user. */
 export function ConsoleBar({ user, lamps }: { user: SessionUser; lamps: readonly Lamp[] }) {
