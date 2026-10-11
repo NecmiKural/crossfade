@@ -1,5 +1,7 @@
 import "server-only";
 import { eq } from "drizzle-orm";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { getAuth } from "@/lib/auth";
 import type { Actor } from "@/lib/core/policy";
 import { getDb } from "@/lib/db/client";
@@ -51,4 +53,31 @@ export async function actorFromRequest(request: Request): Promise<ActorResult> {
 /** Cookie-authenticated JSON endpoints only accept requests from the dashboard origin (CSRF). */
 export function requireSameOrigin(request: Request): boolean {
   return request.headers.get("origin") === new URL(authUrl()).origin;
+}
+
+export type SessionUser = Readonly<{ id: string; name: string; email: string; role: "admin" | "user"; readOnly: boolean }>;
+
+/** The signed-in dashboard user for server components and actions, or null. */
+export async function currentUser(): Promise<SessionUser | null> {
+  const session = await getAuth().api.getSession({ headers: await headers() });
+  if (!session) return null;
+  const { id, name, email, role } = session.user;
+  return { id, name, email, role: role === "admin" ? "admin" : "user", readOnly: Boolean(session.session.impersonatedBy) };
+}
+
+export async function requireUser(): Promise<SessionUser> {
+  const user = await currentUser();
+  if (!user) redirect("/login");
+  return user;
+}
+
+export function userActor(user: SessionUser): Actor {
+  return { kind: "user", id: user.id, role: user.role, readOnly: user.readOnly };
+}
+
+/** Cookies are issued for the canonical origin only, so send visitors there (e.g. localhost → 127.0.0.1). */
+export async function ensureCanonicalHost(path: string): Promise<void> {
+  const canonical = new URL(authUrl());
+  const host = (await headers()).get("host");
+  if (host && host !== canonical.host) redirect(`${canonical.origin}${path}`);
 }
