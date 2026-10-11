@@ -128,6 +128,18 @@ describe("decide(): rolling, step live (error budget and bake)", () => {
     expect(r.events.map((e) => e.type)).toEqual(["engine.rebaselined"]);
   });
 
+  it("re-baselines when counters go backwards without an uptime reset", () => {
+    const r = decide(input(rollingLive, at(30), stats({ completed: 50, errors: 0 })));
+    expect(r.events.map((e) => e.type)).toEqual(["engine.rebaselined"]);
+    expect(r.release.baseline?.candidate).toEqual({ completed: 50, errors: 0 });
+  });
+
+  it("does not mistake uptime rounding for a restart", () => {
+    // baseline taken at 20 s; at 40 s an uptime of 19 s is within the 2 s slack
+    const r = decide(input(rollingLive, at(40), stats({ completed: 200, errors: 1 }, 19)));
+    expect(r.events.map((e) => e.type)).toEqual(["step.published"]);
+  });
+
   it("rolls back when the error budget is breached with enough requests", () => {
     const r = decide(input(rollingLive, at(30), stats({ completed: 141, errors: 14 })));
     expect(r.release).toMatchObject({ status: "rolled_back", weight: 0 });
@@ -166,7 +178,7 @@ describe("decide(): rolling, step live (error budget and bake)", () => {
   });
 
   it("keeps waiting for a person on manual plans even with low traffic", () => {
-    const manual = { ...input(rollingLive, at(4000), stats({ completed: 101, errors: 0 }, 10_000)), plan: PLANS.manual };
+    const manual = { ...input(rollingLive, at(4000), stats({ completed: 101, errors: 1 }, 10_000)), plan: PLANS.manual };
     expect(decide(manual).release.holdReason).toBe("insufficient_data");
   });
 

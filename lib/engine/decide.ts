@@ -81,8 +81,15 @@ function baselineFrom(input: DecideInput): Baseline {
   return { at: now.toISOString(), stable: pick(stats?.stable), candidate: pick(stats?.candidate) };
 }
 
-function envoyRestartedSince(baseline: Baseline, uptimeSeconds: number, now: Date): boolean {
-  return uptimeSeconds < (now.getTime() - Date.parse(baseline.at)) / 1000;
+/** Uptime is a whole number read slightly before `now`, so allow a little slack before calling it a restart. */
+const UPTIME_SLACK_SECONDS = 2;
+
+/** Counters reset when Envoy restarts (uptime) or, defensively, whenever they go backwards. */
+function countersReset(baseline: Baseline, stats: NonNullable<DecideInput["stats"]>, now: Date): boolean {
+  const restarted = stats.uptimeSeconds + UPTIME_SLACK_SECONDS < (now.getTime() - Date.parse(baseline.at)) / 1000;
+  const candidate = stats.candidate;
+  const backwards = !!candidate && (candidate.completed < baseline.candidate.completed || candidate.errors < baseline.candidate.errors);
+  return restarted || backwards;
 }
 
 /** Live: watch the error budget over the step's window, then advance, promote or wait. */
@@ -90,9 +97,9 @@ function decideLive(input: DecideInput): DecideResult {
   const { stats, release, plan, now } = input;
   if (!stats) return hold(input, "stats_unavailable");
   if (!stats.candidate) return hold(input, "candidate_not_at_edge");
-  if (!release.baseline || envoyRestartedSince(release.baseline, stats.uptimeSeconds, now)) {
+  if (!release.baseline || countersReset(release.baseline, stats, now)) {
     const type = release.baseline ? "engine.rebaselined" : "step.bake_started";
-    const message = release.baseline ? "Envoy restarted; analysis window restarted" : `bake started at ${release.weight}%`;
+    const message = release.baseline ? "edge counters reset (Envoy restarted); analysis window restarted" : `bake started at ${release.weight}%`;
     return proceed(input, { baseline: baselineFrom(input) }, [{ type, message }]);
   }
   const n = stats.candidate.completed - release.baseline.candidate.completed;

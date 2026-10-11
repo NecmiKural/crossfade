@@ -12,6 +12,8 @@ import { LIVE_NODE_WINDOW_MS } from "@/lib/releases/view";
 import { clusterName } from "@/lib/xds/render";
 
 export const TICK_MS = 2000;
+/** Timers can fire a little early; checking again slightly before the next tick keeps the cadence at 2 s. */
+const NEXT_CHECK_MS = TICK_MS - 500;
 const RETRY_AFTER_FAILURE_MS = 10_000;
 const MAX_RELEASES_PER_TICK = 50;
 const ENGINE = { kind: "engine", id: null } as const;
@@ -97,7 +99,7 @@ async function processOne(db: Db, stats: ParsedStats | null, edge: DecideInput["
         candidateHealthy: s.candidate.healthy,
       });
     }
-    await tx.update(releases).set({ nextCheckAt: new Date(now.getTime() + TICK_MS) }).where(eq(releases.id, release.id));
+    await tx.update(releases).set({ nextCheckAt: new Date(now.getTime() + NEXT_CHECK_MS) }).where(eq(releases.id, release.id));
     for (const event of result.events) log("info", event.message, { release: release.id, type: event.type });
     return release.id;
   });
