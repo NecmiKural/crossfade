@@ -12,7 +12,8 @@
     "test:db": "vitest run --project db",
     "coverage": "vitest run --project unit --coverage",
     "db:generate": "drizzle-kit generate",
-    "build:workers": "node scripts/build-workers.mjs"
+    "build:workers": "node scripts/build-workers.mjs",
+    "e2e": "node scripts/e2e.mjs"
   },
   "dependencies": {
     "drizzle-orm": "0.45.4",
