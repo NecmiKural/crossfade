@@ -167,6 +167,7 @@ These are worth knowing before you rely on Crossfade:
 - **Mind the timeout.** Routes time out after 60 seconds, and Crossfade never retries, so a retry can never hide a 5xx.
 - **Back up both volumes.** Back up the database volume and the `secrets` volume. Losing `secrets` locks you out of the database and logs everyone out.
 - **Mind the firewall.** Docker-published ports bypass `ufw`. Firewall at the host or provider level.
+- **Read the runbook.** [docs/RUNBOOK.md](docs/RUNBOOK.md) covers failure modes, release holds, secret rotation, backup and restore, and owner lockout.
 
 ## Credits
 
