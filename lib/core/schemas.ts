@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PLAN_IDS } from "@/lib/core/plans";
 
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const LABEL = "[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?";
@@ -20,3 +21,29 @@ export const PathPrefix = z.string().max(100).regex(PATH_PREFIX_RE, "/ or /segme
 export const Port = z.int().min(1).max(65535);
 export const HealthPath = z.string().max(200).regex(HEALTH_PATH_RE, "an absolute path without query or dot segments").default("/healthz");
 export const Password = z.string().min(12).max(128);
+
+export const PlanId = z.enum(PLAN_IDS);
+
+/** Body of PUT /api/v1/releases/:id. With host and port, the candidate version is registered inline. */
+export const ReleaseRequest = z
+  .object({
+    app: Slug,
+    candidate: z.object({
+      name: VersionName,
+      host: Hostname.optional(),
+      port: Port.optional(),
+      healthPath: HealthPath,
+    }),
+    plan: PlanId.optional(),
+    notes: z.string().max(2000).optional(),
+  })
+  .refine((r) => (r.candidate.host === undefined) === (r.candidate.port === undefined), {
+    message: "candidate.host and candidate.port go together",
+    path: ["candidate"],
+  });
+
+export type ReleaseRequestInput = z.infer<typeof ReleaseRequest>;
+
+export function releaseRequestJsonSchema(): unknown {
+  return z.toJSONSchema(ReleaseRequest, { io: "input" });
+}

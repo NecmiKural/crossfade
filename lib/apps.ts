@@ -3,14 +3,12 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { type Allowlist, isAllowed } from "@/lib/core/allowlist";
 import { AppError } from "@/lib/core/errors";
-import { AppKey, Domain, HealthPath, Hostname, PathPrefix, Port, Slug, VersionName } from "@/lib/core/schemas";
+import { AppKey, Domain, HealthPath, Hostname, PathPrefix, PlanId, Port, Slug, VersionName } from "@/lib/core/schemas";
 import type { Tx } from "@/lib/db/client";
 import { apps, versions } from "@/lib/db/schema";
 import { upstreamAllowlist } from "@/lib/env";
 import { appendEvent } from "@/lib/events";
 import { type ActorRef, publishSnapshot } from "@/lib/xds/publish";
-
-export const PlanId = z.enum(["demo", "standard", "cautious", "manual"]);
 
 export const NewApp = z.object({
   slug: Slug,
