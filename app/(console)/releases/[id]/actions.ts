@@ -20,7 +20,7 @@ export async function controlAction(_state: FormState, form: FormData): Promise<
   const user = await requireUser();
   const id = field(form, "id");
   const control = field(form, "control") as Control;
-  if (!(control in DONE)) return { ok: false, message: "Unknown action." };
+  if (!Object.hasOwn(DONE, control)) return { ok: false, message: "Unknown action." };
   try {
     await controlRelease(getDb(), { id, control, actor: userActor(user) });
     revalidatePath(`/releases/${id}`);

@@ -65,5 +65,7 @@ export function applyControl(r: ControlRelease, control: Control): DecideResult 
         publish: true,
         outcome: { kind: "cancelled", reason: "manual", evidence: { step: r.stepIndex, weight: r.weight } },
       };
+    default:
+      return { error: `unknown control ${String(control)}` };
   }
 }

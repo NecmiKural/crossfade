@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PLANS } from "@/lib/core/plans";
-import { applyControl, type ControlRelease } from "@/lib/engine/actions";
+import { applyControl, type Control, type ControlRelease } from "@/lib/engine/actions";
 
 const live = new Date("2026-10-11T12:00:00Z");
 const rolling: ControlRelease = { status: "rolling", stepIndex: 0, weight: 10, stepLiveAt: live, baseline: null, plan: PLANS.demo };
@@ -50,5 +50,9 @@ describe("applyControl", () => {
     ["abort", "rolled_back"],
   ] as const)("refuses %s while %s", (control, status) => {
     expect(applyControl({ ...rolling, status }, control)).toHaveProperty("error");
+  });
+
+  it("refuses a control it does not know", () => {
+    expect(applyControl(rolling, "toString" as Control)).toEqual({ error: "unknown control toString" });
   });
 });

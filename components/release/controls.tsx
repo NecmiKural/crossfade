@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { controlAction } from "@/app/(console)/releases/[id]/actions";
 import {
   AlertDialog,
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import type { Control } from "@/lib/engine/actions";
-import { initialFormState } from "@/lib/form-state";
+import { type FormState, initialFormState } from "@/lib/form-state";
 
 const LABELS: Record<Control, string> = { approve: "Approve", advance: "Advance", pause: "Pause", resume: "Resume", promote: "Promote now", abort: "Abort" };
 const CONFIRM: Partial<Record<Control, { title: string; body: string }>> = {
@@ -25,6 +25,9 @@ const CONFIRM: Partial<Record<Control, { title: string; body: string }>> = {
 /** Hardware-style transport controls. Only the actions that are valid now, for this person, are enabled. */
 export function Controls({ id, available }: { id: string; available: readonly Control[] }) {
   const [state, action, pending] = useActionState(controlAction, initialFormState);
+  // A dialog stays open only for the result it was opened on, so any new result (success or the
+  // error message below the buttons) closes it without an effect.
+  const [confirming, setConfirming] = useState<{ control: Control; on: FormState } | null>(null);
   const formId = `controls-${id}`;
   const order: Control[] = ["approve", "advance", "pause", "resume", "promote", "abort"];
   return (
@@ -43,7 +46,11 @@ export function Controls({ id, available }: { id: string; available: readonly Co
             );
           }
           return (
-            <AlertDialog key={control}>
+            <AlertDialog
+              key={control}
+              open={confirming?.control === control && confirming.on === state}
+              onOpenChange={(open) => setConfirming(open ? { control, on: state } : null)}
+            >
               <AlertDialogTrigger asChild>
                 <Button type="button" variant={variant} disabled={!enabled} className="font-mono text-xs tracking-wider uppercase">
                   {LABELS[control]}
@@ -56,7 +63,7 @@ export function Controls({ id, available }: { id: string; available: readonly Co
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <Button type="submit" form={formId} name="control" value={control} variant={variant}>
+                  <Button type="submit" form={formId} name="control" value={control} variant={variant} disabled={pending}>
                     {LABELS[control]}
                   </Button>
                 </AlertDialogFooter>
