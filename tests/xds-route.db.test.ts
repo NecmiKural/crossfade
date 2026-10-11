@@ -17,11 +17,12 @@ afterAll(async () => {
   await closeDb();
 });
 
-function poll(resource: string, body: Record<string, unknown> | string) {
+function poll(resource: string, body: Record<string, unknown> | string, headers: Record<string, string> = {}) {
+  const text = typeof body === "string" ? body : JSON.stringify(body);
   const request = new Request(`http://control-plane/v3/${resource}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: typeof body === "string" ? body : JSON.stringify(body),
+    headers: { "content-type": "application/json", "content-length": String(Buffer.byteLength(text)), ...headers },
+    body: text,
   });
   return POST(request, { params: Promise.resolve({ resource }) });
 }
@@ -70,6 +71,11 @@ describe("POST /v3/[resource]", () => {
     expect((await poll("discovery:clusters", { node: node("wrong") })).status).toBe(401);
     expect((await poll("discovery:clusters", { node: { id: "edge-1" } })).status).toBe(401);
     expect(await getDb().select().from(edgeNodes)).toHaveLength(0);
+  });
+
+  it("refuses bodies without a length or larger than 64 KB before parsing them", async () => {
+    expect((await poll("discovery:clusters", { node: node() }, { "content-length": "" })).status).toBe(411);
+    expect((await poll("discovery:clusters", { node: node(), pad: "x".repeat(70_000) })).status).toBe(413);
   });
 
   it("returns 404 for other resources and 400 for malformed bodies", async () => {

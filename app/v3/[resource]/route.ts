@@ -13,6 +13,22 @@ import { latestSnapshot, recordPoll } from "@/lib/xds/edge-store";
 
 const empty = (status: number): Response => new Response(null, { status });
 
+/** Real DiscoveryRequests are a few KB; the endpoint is unauthenticated until the token is checked. */
+const MAX_BODY_BYTES = 64 * 1024;
+
+async function readBody(request: Request): Promise<unknown | Response> {
+  const length = Number(request.headers.get("content-length"));
+  if (!Number.isInteger(length) || length <= 0) return empty(411);
+  if (length > MAX_BODY_BYTES) return empty(413);
+  const text = await request.text();
+  if (Buffer.byteLength(text) > MAX_BODY_BYTES) return empty(413);
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * REST-JSON xDS for Envoy (POST /v3/discovery:clusters and /v3/discovery:routes).
  * Any non-200/304 answer makes Envoy keep its last good config and retry on the next poll.
@@ -21,7 +37,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ resource: 
   const kind = resourceKind((await ctx.params).resource);
   if (!kind) return empty(404);
 
-  const body: unknown = await request.json().catch(() => undefined);
+  const body = await readBody(request);
+  if (body instanceof Response) return body;
   const parsed = parseDiscoveryRequest(body);
   if (!parsed.ok) return empty(400);
   if (!tokenMatches(requireSecret("XDS_TOKEN"), parsed.request.token)) return empty(401);
