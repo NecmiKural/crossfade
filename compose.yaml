@@ -80,7 +80,8 @@ services:
     volumes:
       - secrets:/run/crossfade:ro
     ports:
-      - "8080:8080"
+      # Behind a TLS terminator on the same host, set EDGE_BIND=127.0.0.1 so clients cannot bypass it.
+      - "${EDGE_BIND:-0.0.0.0}:8080:8080"
     networks: [control, apps]
     depends_on:
       web:
