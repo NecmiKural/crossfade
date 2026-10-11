@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppSettingsForm, RegisterVersionForm, TesterTokenControls } from "@/components/apps/forms";
 import { Panel } from "@/components/panel";
+import { buttonVariants } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { appDetail } from "@/lib/apps-admin";
 import { can } from "@/lib/core/policy";
@@ -29,6 +30,11 @@ export default async function AppPage({ params }: PageProps<"/apps/[slug]">) {
           {app.domain}
           {app.pathPrefix} · default plan {app.defaultPlan} · {app.sticky ? "sticky" : "random"} split
         </p>
+        {user.readOnly ? null : (
+          <Link href={`/releases/new?app=${app.slug}`} className={buttonVariants({ size: "sm", className: "mt-2" })}>
+            Start release
+          </Link>
+        )}
       </div>
       <Panel legend="Versions">
         <Table>

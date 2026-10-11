@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { StatusBadge } from "@/components/status-badge";
+import { buttonVariants } from "@/components/ui/button";
 import { recentReleases } from "@/lib/console";
 import { getDb } from "@/lib/db/client";
 
@@ -13,7 +14,9 @@ export default async function BoardPage() {
         <h1 id="board-heading" className="text-xl font-semibold tracking-tight">
           Releases
         </h1>
-        <span className="legend">{releases.length} recent</span>
+        <Link href="/releases/new" className={buttonVariants({ size: "sm" })}>
+          Start release
+        </Link>
       </div>
       {releases.length === 0 ? (
         <p className="rounded-lg border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">

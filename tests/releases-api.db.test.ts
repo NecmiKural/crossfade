@@ -169,3 +169,17 @@ describe("GET /api/v1/releases/:id", () => {
     expect(after.releaseSeq).toBe(1);
   });
 });
+
+describe("console-friendly errors", () => {
+  it("name the release already in progress", async () => {
+    const { key } = await world();
+    await put(randomUUID(), v2Request, { "x-api-key": key });
+    const { createRelease } = await import("@/lib/releases/create");
+    const attempt = createRelease(getDb(), {
+      id: randomUUID(),
+      actor: { kind: "user", id: "nobody", role: "user", readOnly: false },
+      body: { app: "shop", candidate: { name: "v3" }, plan: "cautious" },
+    });
+    await expect(attempt).rejects.toMatchObject({ code: "active_release", message: "the app already has a release in progress (SHOP-R1)", details: { active: "SHOP-R1" } });
+  });
+});

@@ -42,7 +42,10 @@ async function lockApp(tx: Tx, app: AppRow): Promise<AppRow> {
     .from(releases)
     .where(and(eq(releases.appId, app.id), inArray(releases.status, [...ACTIVE_STATUSES])))
     .for("update");
-  if (active) throw new AppError("active_release", "the app already has a release in progress", { active: releaseKey(app.key, active.number) });
+  if (active) {
+    const key = releaseKey(app.key, active.number);
+    throw new AppError("active_release", `the app already has a release in progress (${key})`, { active: key });
+  }
   const [locked] = await tx.select().from(apps).where(eq(apps.id, app.id)).for("no key update");
   return locked;
 }
