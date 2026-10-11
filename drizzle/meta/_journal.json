@@ -36,6 +36,13 @@
       "when": 1791690169088,
       "tag": "0004_catalog_format_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791690289036,
+      "tag": "0005_events",
+      "breakpoints": true
     }
   ]
 }

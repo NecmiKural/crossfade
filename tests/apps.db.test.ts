@@ -3,7 +3,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp, registerVersion } from "@/lib/apps";
 import { parseAllowlist } from "@/lib/core/allowlist";
 import { closeDb, getDb, type Tx } from "@/lib/db/client";
-import { apps, snapshots } from "@/lib/db/schema";
+import { apps, events, snapshots } from "@/lib/db/schema";
 import type { ActorRef } from "@/lib/xds/publish";
 import { resetDb } from "./helpers/db";
 
@@ -27,6 +27,12 @@ describe("catalog service", () => {
     expect(shop.stableVersionId).not.toBeNull();
     expect(rows.length).toBe(3);
     expect(latestRoutes[0].virtual_hosts[0].routes[0].route.cluster).toBe("shop--v1");
+    const trail = await getDb().select().from(events).orderBy(events.id);
+    expect(trail.map((e) => [e.type, e.actorKind, e.actorId])).toEqual([
+      ["app.created", "system", "test"],
+      ["version.registered", "system", "test"],
+      ["version.registered", "system", "test"],
+    ]);
   });
 
   it("rejects upstreams that are not on the app's allowlist entry", async () => {

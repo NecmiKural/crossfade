@@ -7,6 +7,7 @@ import { AppKey, Domain, HealthPath, Hostname, PathPrefix, Port, Slug, VersionNa
 import type { Tx } from "@/lib/db/client";
 import { apps, versions } from "@/lib/db/schema";
 import { upstreamAllowlist } from "@/lib/env";
+import { appendEvent } from "@/lib/events";
 import { type ActorRef, publishSnapshot } from "@/lib/xds/publish";
 
 export const PlanId = z.enum(["demo", "standard", "cautious", "manual"]);
@@ -48,6 +49,7 @@ export async function createApp(tx: Tx, input: z.input<typeof NewApp>, actor: Ac
     .insert(apps)
     .values({ ...data, testerToken: randomBytes(32).toString("hex") })
     .returning();
+  await appendEvent(tx, { actor, appId: row.id, type: "app.created", message: `app ${row.slug} created on ${row.domain}${row.pathPrefix}` });
   await publishSnapshot(tx, { reason: `app ${data.slug} created`, actor });
   return row;
 }
@@ -72,6 +74,13 @@ export async function registerVersion(
     .insert(versions)
     .values({ appId: app.id, name: data.name, host: data.host, port: data.port, healthPath: data.healthPath })
     .returning();
+  await appendEvent(tx, {
+    actor,
+    appId: app.id,
+    type: "version.registered",
+    message: `version ${row.name} registered at ${row.host}:${row.port}`,
+    data: { version: row.name, host: row.host, port: row.port },
+  });
   if (!app.stableVersionId) {
     await tx.update(apps).set({ stableVersionId: row.id }).where(eq(apps.id, app.id));
   }

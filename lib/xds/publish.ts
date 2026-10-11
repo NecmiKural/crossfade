@@ -1,5 +1,6 @@
 import { asc, desc, sql } from "drizzle-orm";
 import { sha256Hex } from "@/lib/core/hash";
+import type { ActorRef } from "@/lib/core/policy";
 import type { Tx } from "@/lib/db/client";
 import { apps, snapshots, versions } from "@/lib/db/schema";
 import { renderClusters, renderRoutes } from "@/lib/xds/render";
@@ -9,7 +10,7 @@ import { validateSnapshot } from "@/lib/xds/validate";
 /** Serializes snapshot writers across web, engine and migrate. */
 const SNAPSHOT_LOCK = 0x63660001;
 
-export type ActorRef = Readonly<{ kind: "user" | "apikey" | "engine" | "system"; id: string | null }>;
+export type { ActorRef };
 export type Snapshot = typeof snapshots.$inferSelect;
 
 export class SnapshotValidationError extends Error {
