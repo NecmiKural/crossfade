@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
+  bigint,
+  bigserial,
   boolean,
   check,
   foreignKey,
@@ -65,4 +67,26 @@ export const versions = pgTable(
     check("versions_name_format", sql.raw(`name ~ '${SLUG_SQL}' AND length(name) <= 30`)),
     check("versions_port_range", sql`${t.port} BETWEEN 1 AND 65535`),
   ],
+);
+
+/**
+ * Rendered Envoy config, one row per change. The JSON is stored as text so the xDS handler
+ * serves exactly the bytes that were validated and hashed (Sovereign 1.0: render on write).
+ */
+export const snapshots = pgTable(
+  "snapshots",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    cdsVersion: bigint("cds_version", { mode: "number" }).notNull(),
+    rdsVersion: bigint("rds_version", { mode: "number" }).notNull(),
+    cdsHash: text("cds_hash").notNull(),
+    rdsHash: text("rds_hash").notNull(),
+    clusters: text("clusters").notNull(),
+    routes: text("routes").notNull(),
+    reason: text("reason").notNull(),
+    actorKind: text("actor_kind").notNull(),
+    actorId: text("actor_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("snapshots_actor_kind", sql`${t.actorKind} IN ('user', 'apikey', 'engine', 'system')`)],
 );

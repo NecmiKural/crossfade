@@ -21,3 +21,6 @@ export async function closeDb(): Promise<void> {
   client = undefined;
   await current?.sql.end();
 }
+
+/** A transaction handle, as passed to `getDb().transaction(async (tx) => …)`. */
+export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
