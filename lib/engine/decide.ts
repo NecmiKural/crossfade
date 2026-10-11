@@ -40,9 +40,13 @@ function finish(input: DecideInput, outcome: Outcome, message: string): DecideRe
 /** Warming: the candidate gets no traffic until Envoy reports it healthy (health gate). */
 function decideWarming(input: DecideInput): DecideResult {
   const { stats, plan, release, now } = input;
-  if (!stats) return hold(input, "stats_unavailable");
   const waitedSeconds = secondsBetween(release.statusChangedAt, now);
   const timedOut = waitedSeconds > plan.warmupTimeoutSeconds;
+  if (!stats) {
+    // A dead stats listener must not keep the release (and the app's next one) waiting forever.
+    if (!timedOut) return hold(input, "stats_unavailable");
+    return finish(input, { kind: "cancelled", reason: "stats_unavailable", evidence: { waitedSeconds } }, `no edge stats for ${waitedSeconds} s, cancelled`);
+  }
   if (!stats.candidate) {
     if (!timedOut) return hold(input, "candidate_not_at_edge");
     return finish(input, { kind: "cancelled", reason: "not_at_edge", evidence: { waitedSeconds } }, `candidate never reached the edge in ${waitedSeconds} s, cancelled`);
@@ -99,13 +103,19 @@ function decideLive(input: DecideInput): DecideResult {
     return finish(input, { kind: "rolled_back", reason: "error_budget", evidence }, `error rate ${pct(errors / n)} > ${pct(plan.maxErrorRate)} (n=${n}) — rolled back`);
   }
   if (release.status === "paused") return hold(input, "paused");
-  if (windowSeconds < (plan.steps[release.stepIndex]?.bakeSeconds ?? 0)) return proceed(input, {});
-  return afterBake(input, n);
+  const bakeSeconds = plan.steps[release.stepIndex]?.bakeSeconds ?? 0;
+  if (windowSeconds < bakeSeconds) return proceed(input, {});
+  return afterBake(input, n, windowSeconds - bakeSeconds);
 }
 
-function afterBake(input: DecideInput, n: number): DecideResult {
+function afterBake(input: DecideInput, n: number, secondsPastBake: number): DecideResult {
   const { plan, release } = input;
-  if (n < plan.minRequests) return hold(input, "insufficient_data", { n, minRequests: plan.minRequests });
+  if (n < plan.minRequests) {
+    const limit = plan.insufficientDataTimeoutSeconds;
+    if (limit === null || secondsPastBake <= limit) return hold(input, "insufficient_data", { n, minRequests: plan.minRequests });
+    const evidence = { n, minRequests: plan.minRequests, waitedSeconds: secondsPastBake };
+    return finish(input, { kind: "cancelled", reason: "insufficient_data", evidence }, `only ${n} of ${plan.minRequests} requests after ${secondsPastBake} s, cancelled`);
+  }
   if (!plan.autoAdvance) return hold(input, "awaiting_manual_advance");
   const next = plan.steps[release.stepIndex + 1];
   if (!next) return finish(input, { kind: "promoted", reason: "completed", evidence: { steps: plan.steps.length, n } }, `all ${plan.steps.length} steps clean — promoted`);

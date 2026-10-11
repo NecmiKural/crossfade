@@ -49,7 +49,15 @@ export type DecideInput = Readonly<{
   edge: Readonly<{ liveNodeIds: readonly string[]; minAckedRds: number | null }>;
 }>;
 
-export type OutcomeReason = "completed" | "error_budget" | "candidate_unhealthy" | "health_gate_timeout" | "not_at_edge" | "manual";
+export type OutcomeReason =
+  | "completed"
+  | "error_budget"
+  | "candidate_unhealthy"
+  | "health_gate_timeout"
+  | "not_at_edge"
+  | "stats_unavailable"
+  | "insufficient_data"
+  | "manual";
 
 export type Outcome = Readonly<{
   kind: "promoted" | "rolled_back" | "cancelled";

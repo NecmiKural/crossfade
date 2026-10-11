@@ -17,6 +17,8 @@ describe("plan catalog", () => {
     expect(plan.maxErrorRate).toBeGreaterThan(0);
     expect(plan.maxErrorRate).toBeLessThan(1);
     expect(plan.warmupTimeoutSeconds).toBeGreaterThan(0);
+    expect(plan.insufficientDataTimeoutSeconds === null || plan.insufficientDataTimeoutSeconds > 0).toBe(true);
+    expect(plan.insufficientDataTimeoutSeconds === null).toBe(!plan.autoAdvance);
   });
 
   it("matches the documented demo plan", () => {

@@ -16,6 +16,11 @@ export type Plan = Readonly<{
   autoAdvance: boolean;
   /** How long the candidate may take to become healthy at the edge before the release fails. */
   warmupTimeoutSeconds: number;
+  /**
+   * After a step's bake, how long to wait for minRequests before giving up and cancelling (traffic back
+   * to stable, no incident). null waits for a person (manual plans).
+   */
+  insufficientDataTimeoutSeconds: number | null;
 }>;
 
 /** The broker-style catalog (Open Service Broker "plans"): typed, versioned with the code, served as JSON. */
@@ -31,6 +36,7 @@ export const PLANS: Readonly<Record<PlanId, Plan>> = {
     maxErrorRate: 0.02,
     autoAdvance: true,
     warmupTimeoutSeconds: 60,
+    insufficientDataTimeoutSeconds: 120,
   },
   standard: {
     id: "standard",
@@ -44,6 +50,7 @@ export const PLANS: Readonly<Record<PlanId, Plan>> = {
     maxErrorRate: 0.01,
     autoAdvance: true,
     warmupTimeoutSeconds: 300,
+    insufficientDataTimeoutSeconds: 1800,
   },
   cautious: {
     id: "cautious",
@@ -58,6 +65,7 @@ export const PLANS: Readonly<Record<PlanId, Plan>> = {
     maxErrorRate: 0.005,
     autoAdvance: true,
     warmupTimeoutSeconds: 300,
+    insufficientDataTimeoutSeconds: 3600,
   },
   manual: {
     id: "manual",
@@ -70,6 +78,7 @@ export const PLANS: Readonly<Record<PlanId, Plan>> = {
     maxErrorRate: 0.02,
     autoAdvance: false,
     warmupTimeoutSeconds: 300,
+    insufficientDataTimeoutSeconds: null,
   },
 };
 

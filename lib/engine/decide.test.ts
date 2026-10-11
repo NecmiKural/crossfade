@@ -40,6 +40,12 @@ describe("decide(): warming (health gate)", () => {
     expect(r.publish).toBe(false);
   });
 
+  it("cancels when stats stay unavailable past the warmup timeout", () => {
+    const r = decide(input(warming, at(61), null));
+    expect(r.release).toMatchObject({ status: "cancelled", weight: 0 });
+    expect(r.outcome).toMatchObject({ kind: "cancelled", reason: "stats_unavailable", evidence: { waitedSeconds: 61 } });
+  });
+
   it("holds while Envoy does not know the candidate cluster yet", () => {
     expect(decide(input(warming, at(5), stats(null))).release.holdReason).toBe("candidate_not_at_edge");
   });
@@ -150,6 +156,18 @@ describe("decide(): rolling, step live (error budget and bake)", () => {
   it("holds with the counts when the bake elapsed without enough traffic", () => {
     const r = decide(input(rollingLive, at(40), stats({ completed: 112, errors: 1 })));
     expect(r.release).toMatchObject({ holdReason: "insufficient_data", holdDetail: { n: 12, minRequests: 30 } });
+  });
+
+  it("cancels when traffic stays too low long after the bake", () => {
+    // baseline at 20 s + 15 s bake + 120 s grace → give up after 155 s
+    const r = decide(input(rollingLive, at(156), stats({ completed: 112, errors: 1 })));
+    expect(r.release).toMatchObject({ status: "cancelled", weight: 0 });
+    expect(r.outcome).toMatchObject({ kind: "cancelled", reason: "insufficient_data", evidence: { n: 12, minRequests: 30, waitedSeconds: 121 } });
+  });
+
+  it("keeps waiting for a person on manual plans even with low traffic", () => {
+    const manual = { ...input(rollingLive, at(4000), stats({ completed: 101, errors: 0 }, 10_000)), plan: PLANS.manual };
+    expect(decide(manual).release.holdReason).toBe("insufficient_data");
   });
 
   it("waits for a person on manual plans", () => {
