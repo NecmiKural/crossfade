@@ -13,15 +13,35 @@ import { latestSnapshot, recordPoll } from "@/lib/xds/edge-store";
 
 const empty = (status: number): Response => new Response(null, { status });
 
-/** Real DiscoveryRequests are a few KB; the endpoint is unauthenticated until the token is checked. */
-const MAX_BODY_BYTES = 64 * 1024;
+/**
+ * Envoy's DiscoveryRequest lists every compiled-in extension in node.extensions, which makes it larger
+ * than 64 KB. 1 MiB keeps the unauthenticated part of this endpoint bounded with plenty of headroom.
+ */
+const MAX_BODY_BYTES = 1024 * 1024;
+
+/** Reads at most MAX_BODY_BYTES. Envoy sends REST polls chunked, so there may be no Content-Length. */
+async function readCapped(request: Request): Promise<string | null> {
+  if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES) return null;
+  const reader = request.body?.getReader();
+  if (!reader) return "";
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
 
 async function readBody(request: Request): Promise<unknown | Response> {
-  const length = Number(request.headers.get("content-length"));
-  if (!Number.isInteger(length) || length <= 0) return empty(411);
-  if (length > MAX_BODY_BYTES) return empty(413);
-  const text = await request.text();
-  if (Buffer.byteLength(text) > MAX_BODY_BYTES) return empty(413);
+  const text = await readCapped(request);
+  if (text === null) return empty(413);
   try {
     return JSON.parse(text) as unknown;
   } catch {

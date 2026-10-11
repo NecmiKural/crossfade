@@ -73,9 +73,23 @@ describe("POST /v3/[resource]", () => {
     expect(await getDb().select().from(edgeNodes)).toHaveLength(0);
   });
 
-  it("refuses bodies without a length or larger than 64 KB before parsing them", async () => {
-    expect((await poll("discovery:clusters", { node: node() }, { "content-length": "" })).status).toBe(411);
-    expect((await poll("discovery:clusters", { node: node(), pad: "x".repeat(70_000) })).status).toBe(413);
+  it("refuses bodies larger than 1 MiB, declared or streamed", async () => {
+    expect((await poll("discovery:clusters", { node: node(), pad: "x".repeat(1_100_000) })).status).toBe(413);
+    const chunked = (size: number) =>
+      new Request("http://control-plane/v3/discovery:clusters", {
+        method: "POST",
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(JSON.stringify({ node: node(), pad: "x".repeat(size) })));
+            controller.close();
+          },
+        }),
+        duplex: "half",
+      } as RequestInit);
+    const params = { params: Promise.resolve({ resource: "discovery:clusters" }) };
+    expect((await POST(chunked(1_100_000), params)).status).toBe(413);
+    // A realistic Envoy request is well above 64 KB because of node.extensions.
+    expect((await POST(chunked(200_000), params)).status).toBe(200);
   });
 
   it("returns 404 for other resources and 400 for malformed bodies", async () => {
