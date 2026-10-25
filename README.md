@@ -155,7 +155,7 @@ These are worth knowing before you rely on Crossfade:
 - **Cold start needs the control plane.** If Envoy restarts while `web` is down, it comes back with no routes until `web` returns. Restart the database, then `web`, and Envoy last.
 - **Four-eyes approval stops mistakes, not a malicious admin.** An admin can create a second account.
 
-## Production checklist
+## Hardening checklist
 
 - **Terminate TLS in front.** Run a TLS proxy in front of Envoy and set:
   - `ENVOY_BOOTSTRAP=envoy.behind-proxy.yaml`, so Envoy trusts one `X-Forwarded-For` hop;
