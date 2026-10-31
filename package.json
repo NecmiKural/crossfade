@@ -23,7 +23,7 @@
     "drizzle-orm": "0.45.4",
     "geist": "1.7.2",
     "lucide-react": "1.55.0",
-    "next": "16.4.0",
+    "next": "16.4.3",
     "postgres": "3.4.9",
     "radix-ui": "1.7.0",
     "react": "19.3.0",
